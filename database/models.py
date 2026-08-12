@@ -1,3 +1,4 @@
+from flask_login import UserMixin
 from sqlalchemy import String, Numeric, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
@@ -6,13 +7,13 @@ from database import db
 from database.enums import UserRole, AssetStatus, InvestmentStatus, TransactionStatus, TransactionType
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(String(50), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    role: Mapped[UserRole | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -188,3 +189,15 @@ class AuditLog(db.Model):
     __table_args__ = (
         Index("idx_audit_logs_entity", "entity_type", "entity_id"),
     )
+
+
+class Challenge(db.Model):
+    __tablename__ = "challenges"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    wallet_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    nonce: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

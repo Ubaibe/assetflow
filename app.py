@@ -1,10 +1,22 @@
 from flask import Flask
-from flask_login import LoginManager
+from flask_login import LoginManager, login_required
 from database import db
 from config import Config
+from auth import bp as auth_bp
 
 
 login_manager = LoginManager()
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    return {"error": "Unauthorized"}, 401
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    from database.models import User
+    return User.query.get(int(user_id))
 
 
 def create_app():
@@ -13,6 +25,22 @@ def create_app():
 
     db.init_app(app)
     login_manager.init_app(app)
+
+    app.register_blueprint(auth_bp)
+
+    @app.route("/borrower/dashboard")
+    @login_required
+    def borrower_dashboard():
+        return {"message": "Borrower dashboard"}
+
+    @app.route("/investor/dashboard")
+    @login_required
+    def investor_dashboard():
+        return {"message": "Investor dashboard"}
+
+    @app.route("/public")
+    def public_route():
+        return {"message": "Public"}
 
     with app.app_context():
         db.create_all()

@@ -23,3 +23,5 @@ class Config:
     PAYMENT_MODE = os.getenv("PAYMENT_MODE", "usdt")
     USDT_DECIMALS = os.getenv("USDT_DECIMALS")
     DEPLOYER_ADDRESS = os.getenv("DEPLOYER_ADDRESS")
+
+    AUTH_NONCE_EXPIRY_SECONDS = int(os.getenv("AUTH_NONCE_EXPIRY_SECONDS", "300"))
