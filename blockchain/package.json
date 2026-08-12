@@ -1,0 +1,18 @@
+{
+  "name": "assetflow-blockchain",
+  "version": "1.0.0",
+  "description": "AssetFlow smart contract foundation",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:coverage": "hardhat coverage"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "ethers": "^6.13.0"
+  }
+}
