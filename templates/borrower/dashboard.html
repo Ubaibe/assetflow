@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Borrower Dashboard - AssetFlow{% endblock %}
+
+{% block content %}
+<h2>Borrower Dashboard</h2>
+
+{% if wallet %}
+    <p>Connected: <strong>{{ wallet.address[:6] }}...{{ wallet.address[-4:] }}</strong></p>
+{% endif %}
+
+<p>
+    <a href="/borrower/assets/new" class="btn">Upload Invoice</a>
+</p>
+
+<h3>Your Assets</h3>
+
+{% if assets %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>File Hash</th>
+                <th>Status</th>
+                <th>Documents</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for asset in assets %}
+                <tr>
+                    <td>{{ asset.id }}</td>
+                    <td>{{ asset.asset_hash[:16] }}...</td>
+                    <td>{{ asset.status.value }}</td>
+                    <td>{{ asset.documents | length }}</td>
+                    <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><a href="/borrower/assets/{{ asset.id }}">View</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No assets uploaded yet.</p>
+{% endif %}
+{% endblock %}

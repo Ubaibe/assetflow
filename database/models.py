@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
 from database import db
-from database.enums import UserRole, AssetStatus, InvestmentStatus, TransactionStatus, TransactionType
+from database.enums import UserRole, AssetStatus, InvestmentStatus, TransactionStatus, TransactionType, DocumentStatus
 
 
 class User(UserMixin, db.Model):
@@ -44,8 +44,8 @@ class Asset(db.Model):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     asset_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     invoice_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    face_value: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
-    financing_target: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    face_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
+    financing_target: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     issue_date: Mapped[datetime | None] = mapped_column(nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -74,6 +74,7 @@ class InvoiceDocument(db.Model):
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_size: Mapped[int] = mapped_column(nullable=False)
     file_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    processing_status: Mapped[DocumentStatus] = mapped_column(String(50), default=DocumentStatus.UPLOADED)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     asset: Mapped["Asset"] = relationship(back_populates="documents")

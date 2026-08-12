@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from flask import jsonify, request
+from flask import jsonify, request, session
 from flask_login import login_user, logout_user
 from .services import create_challenge, verify_signature, AuthError
 

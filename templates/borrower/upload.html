@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Invoice - AssetFlow{% endblock %}
+
+{% block content %}
+<h2>Upload Invoice</h2>
+
+<form method="post" action="/borrower/assets" enctype="multipart/form-data">
+    <div style="margin-bottom: 1rem;">
+        <label for="invoice">Select invoice document:</label><br>
+        <input type="file" name="invoice" id="invoice" accept=".pdf,.png,.jpg,.jpeg" required>
+    </div>
+
+    <p class="text-muted">
+        Supported formats: PDF, PNG, JPG/JPEG<br>
+        Maximum file size: {{ max_upload_mb }}MB
+    </p>
+
+    <button type="submit" class="btn">Upload</button>
+    <a href="/borrower/dashboard" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

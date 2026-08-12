@@ -37,3 +37,7 @@ class TransactionType(str, Enum):
     REPAY = "repay"
     CLAIM = "claim"
     OTHER = "other"
+
+
+class DocumentStatus(str, Enum):
+    UPLOADED = "uploaded"

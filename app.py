@@ -3,6 +3,7 @@ from flask_login import LoginManager, login_required
 from database import db
 from config import Config
 from auth import bp as auth_bp
+from borrower import bp as borrower_bp
 
 
 login_manager = LoginManager()
@@ -27,11 +28,7 @@ def create_app():
     login_manager.init_app(app)
 
     app.register_blueprint(auth_bp)
-
-    @app.route("/borrower/dashboard")
-    @login_required
-    def borrower_dashboard():
-        return {"message": "Borrower dashboard"}
+    app.register_blueprint(borrower_bp)
 
     @app.route("/investor/dashboard")
     @login_required

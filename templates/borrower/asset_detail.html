@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Asset {{ asset.id }} - AssetFlow{% endblock %}
+
+{% block content %}
+<h2>Asset #{{ asset.id }}</h2>
+
+<table>
+    <tr>
+        <th>Status</th>
+        <td>{{ asset.status.value }}</td>
+    </tr>
+    <tr>
+        <th>File Hash</th>
+        <td>{{ asset.asset_hash }}</td>
+    </tr>
+    <tr>
+        <th>Created</th>
+        <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+</table>
+
+{% if document %}
+    <h3>Document</h3>
+    <table>
+        <tr>
+            <th>Original Filename</th>
+            <td>{{ document.original_filename }}</td>
+        </tr>
+        <tr>
+            <th>MIME Type</th>
+            <td>{{ document.mime_type }}</td>
+        </tr>
+        <tr>
+            <th>File Size</th>
+            <td>{{ (document.file_size / 1024) | round(1) }} KB</td>
+        </tr>
+        <tr>
+            <th>File Hash</th>
+            <td>{{ document.file_hash }}</td>
+        </tr>
+        <tr>
+            <th>Uploaded</th>
+            <td>{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+    </table>
+    <p>
+        <a href="/borrower/assets/{{ asset.id }}/document" class="btn">View Document</a>
+    </p>
+{% else %}
+    <p>No document uploaded.</p>
+{% endif %}
+
+<p><a href="/borrower/dashboard" class="btn btn-secondary">Back to Dashboard</a></p>
+{% endblock %}
