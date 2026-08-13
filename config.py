@@ -17,6 +17,8 @@ class Config:
     AI_PROVIDER = os.getenv("AI_PROVIDER")
     AI_MODEL = os.getenv("AI_MODEL")
     AI_MODE = os.getenv("AI_MODE", "mock")
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
     BLOCKCHAIN_MODE = os.getenv("BLOCKCHAIN_MODE", "mock")
     BOTCHAIN_NETWORK = os.getenv("BOTCHAIN_NETWORK")
