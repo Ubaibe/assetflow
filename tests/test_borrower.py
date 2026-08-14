@@ -6,6 +6,7 @@ import pytest
 from decimal import Decimal
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 from werkzeug.datastructures import FileStorage
 
 from app import create_app
@@ -13,6 +14,7 @@ from database import db
 from database.models import User, Wallet, Asset, InvoiceDocument, BlockchainTransaction
 from database.enums import AssetStatus
 from database.state_machine import transition, InvalidStatusTransition
+from services.document_processing import DocumentProcessingResult
 
 
 @pytest.fixture
@@ -84,11 +86,24 @@ def _make_pdf_bytes(content: bytes = b"test pdf") -> bytes:
 
 
 def _make_png_bytes() -> bytes:
-    return b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    from PIL import Image
+    buf = io.BytesIO()
+    image = Image.new("RGB", (10, 10), color="red")
+    image.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def _make_jpeg_bytes() -> bytes:
     return b"\xff\xd8\xff\xe0" + b"\x00" * 100
+
+
+def _make_empty_pdf() -> bytes:
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    stream = io.BytesIO()
+    writer.write(stream)
+    return stream.getvalue()
 
 
 def test_borrower_dashboard_requires_auth(client):
@@ -513,3 +528,140 @@ def test_asset_remains_in_initial_offchain_state(client):
         assert asset.status == AssetStatus.DRAFT
         assert asset.asset_hash is not None
         assert asset.id is not None
+
+
+def _make_minimal_pdf_with_text(text: str = "Invoice #123") -> bytes:
+    text_bytes = text.encode("utf-8")
+    stream_len = len(text_bytes) + 20
+
+    header = b"%PDF-1.4\n"
+    obj1 = b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    obj2 = b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    obj3 = (
+        b"3 0 obj\n"
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\n"
+        b"endobj\n"
+    )
+    obj4 = (
+        b"4 0 obj\n"
+        b"<< /Length " + str(stream_len).encode() + b" >>\nstream\n"
+        b"BT\n/F1 12 Tf\n10 180 Td\n(" + text_bytes + b") Tj\nET\n"
+        b"endstream\nendobj\n"
+    )
+    obj5 = b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+
+    body = obj1 + obj2 + obj3 + obj4 + obj5
+    xref_offset = len(header) + len(body)
+    xref = b"xref\n0 6\n0000000000 65535 f \n"
+
+    off1 = len(header)
+    off2 = off1 + len(obj1)
+    off3 = off2 + len(obj2)
+    off4 = off3 + len(obj3)
+    off5 = off4 + len(obj4)
+
+    xref += f"{off1:010d} 00000 n \n".encode()
+    xref += f"{off2:010d} 00000 n \n".encode()
+    xref += f"{off3:010d} 00000 n \n".encode()
+    xref += f"{off4:010d} 00000 n \n".encode()
+    xref += f"{off5:010d} 00000 n \n".encode()
+
+    trailer = b"trailer\n<< /Size 6 /Root 1 0 R >>\n"
+    startxref = b"startxref\n" + str(xref_offset).encode() + b"\n"
+    eof = b"%%EOF\n"
+
+    return header + body + xref + trailer + startxref + eof
+
+
+def test_text_pdf_upload_sets_processing_mode_text(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_mode == "text"
+
+
+def test_image_upload_sets_processing_mode_vision(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    png_bytes = _make_png_bytes()
+    data = {
+        "invoice": _make_file_storage(png_bytes, "invoice.png", "image/png"),
+    }
+    response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_mode == "vision"
+
+
+def test_scanned_pdf_upload_sets_processing_mode_vision(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    scanned_pdf = _make_empty_pdf()
+    data = {
+        "invoice": _make_file_storage(scanned_pdf, "scanned.pdf", "application/pdf"),
+    }
+    response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_mode == "vision"
+
+
+def test_document_processor_failure_does_not_break_upload(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_pdf_bytes()
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.DocumentProcessor") as mock_processor:
+        mock_processor.return_value.process.side_effect = Exception("Processor crashed")
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_mode is None
+
+
+def test_document_processor_is_called_during_upload(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_pdf_bytes()
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.DocumentProcessor") as mock_processor_cls:
+        mock_result = DocumentProcessingResult(
+            document_type="pdf",
+            processing_mode="text",
+            extracted_text="Invoice text",
+            original_mime_type="application/pdf",
+        )
+        mock_processor_cls.return_value.process.return_value = mock_result
+        client.post("/borrower/assets", data=data)
+    mock_processor_cls.assert_called_once()

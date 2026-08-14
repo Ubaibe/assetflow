@@ -75,6 +75,7 @@ class InvoiceDocument(db.Model):
     file_size: Mapped[int] = mapped_column(nullable=False)
     file_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     processing_status: Mapped[DocumentStatus] = mapped_column(String(50), default=DocumentStatus.UPLOADED)
+    processing_mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     asset: Mapped["Asset"] = relationship(back_populates="documents")

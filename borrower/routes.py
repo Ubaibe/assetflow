@@ -7,6 +7,7 @@ from database import db
 from database.models import Asset, InvoiceDocument
 from database.state_machine import transition
 from database.enums import AssetStatus
+from services.document_processing import DocumentProcessor
 from services.upload import validate_and_save_upload, UploadError
 
 
@@ -81,6 +82,20 @@ def create_asset():
         )
         db.session.add(document)
         db.session.commit()
+
+        processor = DocumentProcessor()
+        try:
+            with open(destination, "rb") as stream:
+                doc_result = processor.process(
+                    stream,
+                    original_filename,
+                    file_storage.content_type or "application/octet-stream",
+                    current_app.config["MAX_UPLOAD_MB"] * 1024 * 1024,
+                )
+            document.processing_mode = doc_result.processing_mode
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         flash("Invoice uploaded successfully", "success")
         return redirect(url_for("borrower.asset_detail", asset_id=asset.id))
