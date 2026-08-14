@@ -8,6 +8,7 @@ from database.models import Asset, InvoiceDocument
 from database.state_machine import transition
 from database.enums import AssetStatus
 from services.document_processing import DocumentProcessor
+from services.invoice_extraction_persistence import persist_extraction
 from services.invoice_pipeline import InvoicePipelineError, extract_invoice
 from services.upload import validate_and_save_upload, UploadError
 
@@ -99,6 +100,7 @@ def create_asset():
         except Exception:
             db.session.rollback()
 
+        extraction_result = None
         if doc_result is not None:
             try:
                 ai_config = {
@@ -109,7 +111,7 @@ def create_asset():
                     "AGENTROUTER_BASE_URL": current_app.config.get("AGENTROUTER_BASE_URL"),
                 }
                 with open(destination, "rb") as stream:
-                    extract_invoice(
+                    extraction_result = extract_invoice(
                         ai_config,
                         stream,
                         original_filename,
@@ -118,6 +120,13 @@ def create_asset():
                     )
             except InvoicePipelineError:
                 pass
+
+        if extraction_result is not None:
+            try:
+                persist_extraction(db.session, asset.id, extraction_result, doc_result.processing_mode)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
         flash("Invoice uploaded successfully", "success")
         return redirect(url_for("borrower.asset_detail", asset_id=asset.id))

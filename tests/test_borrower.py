@@ -4,14 +4,14 @@ import os
 import tempfile
 import pytest
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from werkzeug.datastructures import FileStorage
 
 from app import create_app
 from database import db
-from database.models import User, Wallet, Asset, InvoiceDocument, BlockchainTransaction
+from database.models import User, Wallet, Asset, InvoiceDocument, BlockchainTransaction, AIAnalysis
 from database.enums import AssetStatus
 from database.state_machine import transition, InvalidStatusTransition
 from services.document_processing import DocumentProcessingResult
@@ -796,3 +796,161 @@ def test_no_api_key_leakage_in_response(client):
         flashes = sess.get("_flashes", [])
     all_flash_messages = " ".join(msg for _, msg in flashes)
     assert "super-secret-key" not in all_flash_messages
+
+
+def test_successful_text_extraction_persists_asset_fields(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2024, 1, 15),
+        due_date=date(2024, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.invoice_number == "INV-001"
+        assert asset.face_value == Decimal("100.00")
+        assert asset.currency == "USD"
+
+
+def test_successful_vision_extraction_persists_asset_fields(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    png_bytes = _make_png_bytes()
+    data = {
+        "invoice": _make_file_storage(png_bytes, "invoice.png", "image/png"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-002",
+        amount=Decimal("200.00"),
+        currency="EUR",
+        provider="mock",
+        confidence=0.88,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.invoice_number == "INV-002"
+        assert asset.face_value == Decimal("200.00")
+        assert asset.currency == "EUR"
+
+
+def test_ai_analysis_created_on_successful_extraction(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-003",
+        provider="mock",
+        model="mock-model",
+        confidence=0.92,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        client.post("/borrower/assets", data=data)
+
+    with client.application.app_context():
+        analysis = AIAnalysis.query.filter_by(asset_id=Asset.query.first().id).first()
+        assert analysis is not None
+        assert analysis.provider == "mock"
+        assert analysis.model == "mock-model"
+        assert analysis.confidence == Decimal("0.92")
+        assert analysis.extraction_output == "text"
+
+
+def test_optional_extraction_fields_do_not_crash_persistence(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        provider="mock",
+        confidence=None,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        analysis = AIAnalysis.query.filter_by(asset_id=Asset.query.first().id).first()
+        assert analysis is not None
+        assert analysis.confidence is None
+
+
+def test_persistence_failure_does_not_destroy_upload(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(invoice_number="INV-004")
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.persist_extraction") as mock_persist:
+            mock_persist.side_effect = Exception("DB error")
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.original_filename == "invoice.pdf"
+        assert AIAnalysis.query.filter_by(asset_id=asset.id).first() is None
+
+
+def test_no_api_key_persisted(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-005",
+        provider="agentrouter",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        client.post("/borrower/assets", data=data)
+
+    with client.application.app_context():
+        analysis = AIAnalysis.query.filter_by(asset_id=Asset.query.first().id).first()
+        assert analysis is not None
+        assert "AGENTROUTER_API_KEY" not in (analysis.raw_result or "")
+        assert "Bearer" not in (analysis.raw_result or "")
+        assert "Authorization" not in (analysis.raw_result or "")
