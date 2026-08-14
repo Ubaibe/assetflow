@@ -8,6 +8,7 @@ from database.models import Asset, InvoiceDocument
 from database.state_machine import transition
 from database.enums import AssetStatus
 from services.document_processing import DocumentProcessor
+from services.invoice_pipeline import InvoicePipelineError, extract_invoice
 from services.upload import validate_and_save_upload, UploadError
 
 
@@ -84,6 +85,7 @@ def create_asset():
         db.session.commit()
 
         processor = DocumentProcessor()
+        doc_result = None
         try:
             with open(destination, "rb") as stream:
                 doc_result = processor.process(
@@ -96,6 +98,26 @@ def create_asset():
             db.session.commit()
         except Exception:
             db.session.rollback()
+
+        if doc_result is not None:
+            try:
+                ai_config = {
+                    "AI_PROVIDER": current_app.config.get("AI_PROVIDER"),
+                    "AI_MODE": current_app.config.get("AI_MODE"),
+                    "AI_MODEL": current_app.config.get("AI_MODEL"),
+                    "AGENTROUTER_API_KEY": current_app.config.get("AGENTROUTER_API_KEY"),
+                    "AGENTROUTER_BASE_URL": current_app.config.get("AGENTROUTER_BASE_URL"),
+                }
+                with open(destination, "rb") as stream:
+                    extract_invoice(
+                        ai_config,
+                        stream,
+                        original_filename,
+                        file_storage.content_type or "application/octet-stream",
+                        current_app.config["MAX_UPLOAD_MB"] * 1024 * 1024,
+                    )
+            except InvoicePipelineError:
+                pass
 
         flash("Invoice uploaded successfully", "success")
         return redirect(url_for("borrower.asset_detail", asset_id=asset.id))
