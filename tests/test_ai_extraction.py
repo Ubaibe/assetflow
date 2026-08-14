@@ -1,12 +1,14 @@
 import io
 from decimal import Decimal
+from unittest.mock import patch
+import requests
 import pytest
 from services.ai_extraction import (
     ExtractionService,
     InvoiceExtractionResult,
     AIProviderError,
 )
-from services.ai_provider import MockAIProvider, OpenRouterAIProvider, OpenAIProvider
+from services.ai_provider import MockAIProvider, OpenRouterAIProvider, OpenAIProvider, AgentRouterAIProvider
 from services.document_processing import DocumentProcessor, DocumentProcessingResult
 
 
@@ -249,3 +251,80 @@ def test_provider_independent_extraction():
     service = ExtractionService(provider)
     result = service.extract(doc_result)
     assert isinstance(result, InvoiceExtractionResult)
+
+
+def test_agentrouter_text_extraction_success():
+    processor = DocumentProcessor()
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $500.00")
+    doc_result = processor.process(io.BytesIO(pdf_bytes), "invoice.pdf", "application/pdf")
+
+    provider = AgentRouterAIProvider(model="gpt-4o", api_key="sk-test")
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"invoice_number": "INV-999", "amount": "500.00", "currency": "USD", "confidence": 0.92}'
+                }
+            }
+        ]
+    }
+    with patch("services.ai_provider.requests.post") as mock_post:
+        mock_post.return_value.json.return_value = mock_response
+        mock_post.return_value.raise_for_status.return_value = None
+        service = ExtractionService(provider)
+        result = service.extract(doc_result)
+
+    assert isinstance(result, InvoiceExtractionResult)
+    assert result.invoice_number == "INV-999"
+    assert result.amount == Decimal("500.00")
+    assert result.currency == "USD"
+    assert result.confidence == 0.92
+    assert result.provider == "agentrouter"
+
+
+def test_agentrouter_network_failure():
+    processor = DocumentProcessor()
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    doc_result = processor.process(io.BytesIO(pdf_bytes), "invoice.pdf", "application/pdf")
+
+    provider = AgentRouterAIProvider(model="gpt-4o", api_key="sk-test")
+    with patch("services.ai_provider.requests.post") as mock_post:
+        mock_post.side_effect = requests.exceptions.ConnectionError("Connection error")
+        service = ExtractionService(provider)
+        with pytest.raises(AIProviderError, match="AgentRouter API request failed"):
+            service.extract(doc_result)
+
+
+def test_agentrouter_malformed_response():
+    processor = DocumentProcessor()
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    doc_result = processor.process(io.BytesIO(pdf_bytes), "invoice.pdf", "application/pdf")
+
+    provider = AgentRouterAIProvider(model="gpt-4o", api_key="sk-test")
+    with patch("services.ai_provider.requests.post") as mock_post:
+        mock_post.return_value.json.return_value = {"choices": []}
+        mock_post.return_value.raise_for_status.return_value = None
+        service = ExtractionService(provider)
+        with pytest.raises(AIProviderError, match="Invalid AgentRouter response structure"):
+            service.extract(doc_result)
+
+
+def test_agentrouter_vision_unsupported_raises():
+    processor = DocumentProcessor()
+    png_bytes = _make_png_bytes()
+    doc_result = processor.process(io.BytesIO(png_bytes), "invoice.png", "image/png")
+
+    provider = AgentRouterAIProvider(model="gpt-3.5-turbo", api_key="sk-test")
+    service = ExtractionService(provider)
+    with pytest.raises(AIProviderError, match="does not support vision extraction"):
+        service.extract(doc_result)
+
+
+def test_agentrouter_no_api_key_leakage():
+    provider = AgentRouterAIProvider(model="gpt-4o", api_key="super-secret-key")
+    with patch("services.ai_provider.requests.post") as mock_post:
+        mock_post.side_effect = requests.exceptions.ConnectionError("Connection error")
+        try:
+            provider.extract_invoice_fields(b"data", "application/pdf", processing_mode="text", extracted_text="text")
+        except AIProviderError as exc:
+            assert "super-secret-key" not in str(exc)

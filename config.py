@@ -19,6 +19,8 @@ class Config:
     AI_MODE = os.getenv("AI_MODE", "mock")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    AGENTROUTER_API_KEY = os.getenv("AGENTROUTER_API_KEY")
+    AGENTROUTER_BASE_URL = os.getenv("AGENTROUTER_BASE_URL", "https://api.agentrouter.com/v1")
 
     BLOCKCHAIN_MODE = os.getenv("BLOCKCHAIN_MODE", "mock")
     BOTCHAIN_NETWORK = os.getenv("BOTCHAIN_NETWORK")

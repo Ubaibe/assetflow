@@ -18,6 +18,7 @@ class InvoiceExtractionResult(BaseModel):
     seller_address: Optional[str] = None
     buyer_name: Optional[str] = None
     buyer_address: Optional[str] = None
+    amount: Optional[Decimal] = None
     currency: Optional[str] = None
     subtotal: Optional[Decimal] = None
     tax: Optional[Decimal] = None
@@ -50,7 +51,7 @@ class InvoiceExtractionResult(BaseModel):
             raise ValueError(f"Confidence must be between 0.0 and 1.0, got {v}")
         return v
 
-    @field_validator("subtotal", "tax", "total_amount", mode="before")
+    @field_validator("amount", "subtotal", "tax", "total_amount", mode="before")
     @classmethod
     def validate_monetary(cls, v: Optional[Union[Decimal, str, float]]) -> Optional[Decimal]:
         if v is None:
