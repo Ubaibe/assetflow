@@ -6,9 +6,10 @@ from werkzeug.datastructures import FileStorage
 from database import db
 from database.models import Asset, InvoiceDocument
 from database.state_machine import transition
-from database.enums import AssetStatus
+from database.enums import AssetStatus, DocumentStatus
 from services.document_processing import DocumentProcessor
 from services.invoice_extraction_persistence import persist_extraction
+from services.invoice_extraction_status import set_document_status
 from services.invoice_pipeline import InvoicePipelineError, extract_invoice
 from services.upload import validate_and_save_upload, UploadError
 
@@ -96,9 +97,13 @@ def create_asset():
                     current_app.config["MAX_UPLOAD_MB"] * 1024 * 1024,
                 )
             document.processing_mode = doc_result.processing_mode
+            set_document_status(db.session, document, DocumentStatus.PROCESSED)
             db.session.commit()
         except Exception:
             db.session.rollback()
+            set_document_status(db.session, document, DocumentStatus.PROCESSING_FAILED)
+            db.session.add(document)
+            db.session.commit()
 
         extraction_result = None
         if doc_result is not None:
@@ -119,14 +124,23 @@ def create_asset():
                         current_app.config["MAX_UPLOAD_MB"] * 1024 * 1024,
                     )
             except InvoicePipelineError:
-                pass
+                set_document_status(db.session, document, DocumentStatus.EXTRACTION_FAILED)
+                db.session.add(document)
+                db.session.commit()
 
         if extraction_result is not None:
             try:
                 persist_extraction(db.session, asset.id, extraction_result, doc_result.processing_mode)
+                set_document_status(db.session, document, DocumentStatus.EXTRACTED)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+                try:
+                    set_document_status(db.session, document, DocumentStatus.EXTRACTION_FAILED)
+                    db.session.add(document)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
         flash("Invoice uploaded successfully", "success")
         return redirect(url_for("borrower.asset_detail", asset_id=asset.id))

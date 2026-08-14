@@ -41,3 +41,7 @@ class TransactionType(str, Enum):
 
 class DocumentStatus(str, Enum):
     UPLOADED = "uploaded"
+    PROCESSED = "processed"
+    PROCESSING_FAILED = "processing_failed"
+    EXTRACTED = "extracted"
+    EXTRACTION_FAILED = "extraction_failed"

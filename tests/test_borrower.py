@@ -12,7 +12,7 @@ from werkzeug.datastructures import FileStorage
 from app import create_app
 from database import db
 from database.models import User, Wallet, Asset, InvoiceDocument, BlockchainTransaction, AIAnalysis
-from database.enums import AssetStatus
+from database.enums import AssetStatus, DocumentStatus
 from database.state_machine import transition, InvalidStatusTransition
 from services.document_processing import DocumentProcessingResult
 from services.invoice_pipeline import InvoicePipelineError, extract_invoice
@@ -954,3 +954,129 @@ def test_no_api_key_persisted(client):
         assert "AGENTROUTER_API_KEY" not in (analysis.raw_result or "")
         assert "Bearer" not in (analysis.raw_result or "")
         assert "Authorization" not in (analysis.raw_result or "")
+
+
+def test_successful_text_extraction_sets_status_extracted(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.EXTRACTED
+        assert doc.processing_mode == "text"
+
+
+def test_successful_vision_extraction_sets_status_extracted(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    png_bytes = _make_png_bytes()
+    data = {
+        "invoice": _make_file_storage(png_bytes, "invoice.png", "image/png"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-002",
+        provider="mock",
+        confidence=0.88,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.EXTRACTED
+        assert doc.processing_mode == "vision"
+
+
+def test_document_processing_failure_sets_status_processing_failed(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_pdf_bytes()
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.DocumentProcessor") as mock_processor_cls:
+        mock_processor_cls.return_value.process.side_effect = Exception("Processor crashed")
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.PROCESSING_FAILED
+        assert doc.processing_mode is None
+        assert AIAnalysis.query.filter_by(asset_id=asset.id).first() is None
+
+
+def test_ai_extraction_failure_sets_status_extraction_failed(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.side_effect = InvoicePipelineError("AI extraction failed")
+        response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.EXTRACTION_FAILED
+        assert doc.processing_mode == "text"
+        assert AIAnalysis.query.filter_by(asset_id=asset.id).first() is None
+
+
+def test_persistence_failure_sets_status_extraction_failed(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(invoice_number="INV-006")
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.persist_extraction") as mock_persist:
+            mock_persist.side_effect = Exception("DB error")
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.EXTRACTION_FAILED
+        assert AIAnalysis.query.filter_by(asset_id=asset.id).first() is None
