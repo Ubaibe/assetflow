@@ -17,6 +17,8 @@ from database.state_machine import transition, InvalidStatusTransition
 from services.document_processing import DocumentProcessingResult
 from services.invoice_pipeline import InvoicePipelineError, extract_invoice
 from services.ai_extraction import InvoiceExtractionResult
+from services.invoice_verification import InvoiceVerificationResult
+from services.financing_submission import FinancingSubmissionResult, submit_financing
 
 
 @pytest.fixture
@@ -1080,3 +1082,477 @@ def test_persistence_failure_sets_status_extraction_failed(client):
         assert doc is not None
         assert doc.processing_status == DocumentStatus.EXTRACTION_FAILED
         assert AIAnalysis.query.filter_by(asset_id=asset.id).first() is None
+
+
+def test_verification_runs_after_successful_extraction(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_verify.assert_called_once()
+
+
+def test_verification_does_not_run_after_extraction_failure(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.side_effect = InvoicePipelineError("AI extraction failed")
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_verify.assert_not_called()
+
+
+def test_verification_failure_leaves_asset_in_draft(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(
+        eligible=False,
+        failed_checks=["face_value"],
+        checks={"face_value": False},
+        reasons=["Invoice face value must be greater than zero"],
+        message="Invoice is not eligible: Invoice face value must be greater than zero",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.processing_status == DocumentStatus.EXTRACTED
+
+
+def test_verification_success_leaves_asset_in_draft(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+
+
+def test_verification_uses_controlled_today(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.datetime") as mock_datetime:
+            mock_datetime.utcnow.return_value = datetime(2099, 1, 1)
+            with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+                mock_verification = InvoiceVerificationResult(eligible=True)
+                mock_verify.return_value = mock_verification
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_verify.assert_called_once()
+    _, kwargs = mock_verify.call_args
+    assert kwargs["today"] == date(2099, 1, 1)
+
+
+def test_eligible_invoice_reaches_financing_submission(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    mock_submission = FinancingSubmissionResult(
+        submitted=True,
+        eligible=True,
+        transaction_hash="0x" + "c" * 64,
+        asset_id=42,
+        block_number=12345,
+        gas_used=21000,
+        message="Asset created successfully",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = mock_submission
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_called_once()
+
+
+def test_ineligible_invoice_does_not_submit(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(
+        eligible=False,
+        failed_checks=["invoice_number"],
+        reasons=["Invoice number is missing"],
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_not_called()
+
+
+def test_extraction_failure_does_not_submit(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.side_effect = InvoicePipelineError("AI extraction failed")
+        with patch("borrower.routes.submit_financing") as mock_submit:
+            response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_not_called()
+
+
+def test_persistence_failure_does_not_submit(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.persist_extraction") as mock_persist:
+            mock_persist.side_effect = Exception("DB error")
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_not_called()
+
+
+def test_verification_failure_does_not_submit(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(
+        eligible=False,
+        failed_checks=["face_value"],
+        reasons=["Invoice face value must be greater than zero"],
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_not_called()
+
+
+def test_blockchain_disabled_does_not_make_rpc_call(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = FinancingSubmissionResult(
+                    submitted=False,
+                    eligible=True,
+                    message="Financing is eligible but blockchain submission is disabled",
+                )
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    mock_submit.assert_called_once()
+    _, kwargs = mock_submit.call_args
+    assert kwargs["config"]["RPC_URL"] is None
+    assert kwargs["config"]["ASSET_REGISTRY_ADDRESS"] is None
+
+
+def test_successful_mocked_submission(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    mock_submission = FinancingSubmissionResult(
+        submitted=True,
+        eligible=True,
+        transaction_hash="0x" + "c" * 64,
+        asset_id=42,
+        block_number=12345,
+        gas_used=21000,
+        message="Asset created successfully",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = mock_submission
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    all_flash_messages = " ".join(msg for _, msg in flashes)
+    assert "financing has been submitted" in all_flash_messages
+
+
+def test_failed_mocked_submission_leaves_upload_durable(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    mock_submission = FinancingSubmissionResult(
+        submitted=False,
+        eligible=True,
+        message="Transaction reverted: 0xabc",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = mock_submission
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT
+        doc = InvoiceDocument.query.first()
+        assert doc is not None
+        assert doc.original_filename == "invoice.pdf"
+
+
+def test_no_secret_leakage_in_borrower_response(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    mock_submission = FinancingSubmissionResult(
+        submitted=False,
+        eligible=True,
+        message="AssetRegistry configuration error: PRIVATE_KEY is required: 0xsuper-secret-key",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = mock_submission
+                response = client.post("/borrower/assets", data=data)
+    assert response.status_code == 302
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    all_flash_messages = " ".join(msg for _, msg in flashes)
+    assert "super-secret-key" not in all_flash_messages
+    assert "PRIVATE_KEY" not in all_flash_messages
+
+
+def test_asset_remains_draft_after_failed_submission(client):
+    user_id, account = _create_user(client.application)
+    _login(client, user_id, account)
+
+    pdf_bytes = _make_minimal_pdf_with_text("Invoice ABC\nTotal: $100.00")
+    data = {
+        "invoice": _make_file_storage(pdf_bytes, "invoice.pdf", "application/pdf"),
+    }
+    mock_result = InvoiceExtractionResult(
+        invoice_number="INV-001",
+        amount=Decimal("100.00"),
+        currency="USD",
+        issue_date=date(2099, 1, 15),
+        due_date=date(2099, 2, 15),
+        provider="mock",
+        confidence=0.95,
+    )
+    mock_verification = InvoiceVerificationResult(eligible=True)
+    mock_submission = FinancingSubmissionResult(
+        submitted=False,
+        eligible=True,
+        message="Transaction reverted",
+    )
+    with patch("borrower.routes.extract_invoice") as mock_extract:
+        mock_extract.return_value = mock_result
+        with patch("borrower.routes.verify_invoice_eligibility") as mock_verify:
+            mock_verify.return_value = mock_verification
+            with patch("borrower.routes.submit_financing") as mock_submit:
+                mock_submit.return_value = mock_submission
+                client.post("/borrower/assets", data=data)
+
+    with client.application.app_context():
+        asset = Asset.query.first()
+        assert asset is not None
+        assert asset.status == AssetStatus.DRAFT

@@ -1,6 +1,7 @@
 from flask import Blueprint
 from flask_login import login_required, current_user
 from flask import render_template, request, redirect, url_for, flash, abort, current_app
+from datetime import datetime
 from pathlib import Path
 from werkzeug.datastructures import FileStorage
 from database import db
@@ -11,6 +12,9 @@ from services.document_processing import DocumentProcessor
 from services.invoice_extraction_persistence import persist_extraction
 from services.invoice_extraction_status import set_document_status
 from services.invoice_pipeline import InvoicePipelineError, extract_invoice
+from services.asset_registry_client import AssetRegistryClientError
+from services.financing_submission import FinancingSubmissionResult, sanitize_message, submit_financing
+from services.invoice_verification import verify_invoice_eligibility
 from services.upload import validate_and_save_upload, UploadError
 
 
@@ -128,11 +132,13 @@ def create_asset():
                 db.session.add(document)
                 db.session.commit()
 
+        extraction_persisted = False
         if extraction_result is not None:
             try:
                 persist_extraction(db.session, asset.id, extraction_result, doc_result.processing_mode)
                 set_document_status(db.session, document, DocumentStatus.EXTRACTED)
                 db.session.commit()
+                extraction_persisted = True
             except Exception:
                 db.session.rollback()
                 try:
@@ -142,7 +148,62 @@ def create_asset():
                 except Exception:
                     db.session.rollback()
 
-        flash("Invoice uploaded successfully", "success")
+        verification = None
+        if extraction_persisted:
+            try:
+                verification = verify_invoice_eligibility(
+                    asset,
+                    document,
+                    today=datetime.utcnow().date(),
+                )
+            except Exception:
+                pass
+
+        submission = None
+        if verification is not None and verification.eligible:
+            wallet = _get_user_wallet()
+            if not wallet:
+                flash("Invoice is eligible for financing, but blockchain submission requires a connected wallet.", "warning")
+            else:
+                originator_address = wallet.address
+                blockchain_config = {
+                    "RPC_URL": current_app.config.get("RPC_URL"),
+                    "ASSET_REGISTRY_ADDRESS": current_app.config.get("ASSET_REGISTRY_ADDRESS"),
+                    "PRIVATE_KEY": current_app.config.get("PRIVATE_KEY"),
+                    "CHAIN_ID": current_app.config.get("CHAIN_ID"),
+                }
+                try:
+                    submission = submit_financing(
+                        asset,
+                        document,
+                        today=datetime.utcnow(),
+                        originator_address=originator_address,
+                        config=blockchain_config,
+                    )
+                except AssetRegistryClientError:
+                    submission = FinancingSubmissionResult(
+                        submitted=False,
+                        eligible=True,
+                        message="AssetRegistry client error",
+                    )
+
+        if verification is not None and not verification.eligible:
+            flash(
+                f"Invoice uploaded successfully but is not eligible for financing: {verification.message}",
+                "warning",
+            )
+        elif submission is not None and submission.submitted:
+            flash("Invoice uploaded successfully and financing has been submitted to the blockchain", "success")
+        elif submission is not None and not submission.submitted:
+            flash(
+                f"Invoice is eligible for financing but blockchain submission failed: {sanitize_message(submission.message)}",
+                "warning",
+            )
+        elif verification is not None and verification.eligible:
+            flash("Invoice uploaded successfully and is eligible for financing", "success")
+        else:
+            flash("Invoice uploaded successfully", "success")
+
         return redirect(url_for("borrower.asset_detail", asset_id=asset.id))
     except Exception:
         db.session.rollback()
