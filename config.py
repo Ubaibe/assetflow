@@ -44,3 +44,4 @@ class Config:
     PRIVATE_KEY = os.getenv("PRIVATE_KEY") or None
 
     AUTH_NONCE_EXPIRY_SECONDS = int(os.getenv("AUTH_NONCE_EXPIRY_SECONDS", "300"))
+    PORT = int(os.getenv("PORT", "5000"))
