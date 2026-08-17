@@ -177,6 +177,38 @@ def test_monetary_unit_conversion(app):
     assert result.payload["financingTarget"] == 500000000000000000
 
 
+def test_monetary_unit_conversion_with_6_decimals(app):
+    asset_id = _create_asset(app, face_value=Decimal("50.00"), financing_target=Decimal("80.00"))
+    with app.app_context():
+        asset = db.session.get(Asset, asset_id)
+        document = InvoiceDocument.query.filter_by(asset_id=asset_id).first()
+        result = prepare_financing(asset, document, token_decimals=6)
+    assert result.eligible is True
+    assert result.payload["faceValue"] == 50000000
+    assert result.payload["financingTarget"] == 80000000
+
+
+def test_monetary_unit_conversion_with_6_decimals_small_amount(app):
+    asset_id = _create_asset(app, face_value=Decimal("0.01"), financing_target=Decimal("0.02"))
+    with app.app_context():
+        asset = db.session.get(Asset, asset_id)
+        document = InvoiceDocument.query.filter_by(asset_id=asset_id).first()
+        result = prepare_financing(asset, document, token_decimals=6)
+    assert result.eligible is True
+    assert result.payload["faceValue"] == 10000
+    assert result.payload["financingTarget"] == 20000
+
+
+def test_monetary_unit_conversion_with_6_decimals_rejects_excess_precision(app):
+    asset_id = _create_asset(app, face_value=Decimal("0.000001"), financing_target=Decimal("0.000002"))
+    with app.app_context():
+        asset = db.session.get(Asset, asset_id)
+        document = InvoiceDocument.query.filter_by(asset_id=asset_id).first()
+        result = prepare_financing(asset, document, token_decimals=6)
+    assert result.eligible is False
+    assert "face_value" in result.failed_checks or "financing_target" in result.failed_checks
+
+
 def test_no_blockchain_calls(app):
     asset_id = _create_asset(app)
     with app.app_context():

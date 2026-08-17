@@ -31,8 +31,8 @@ def _build_mock_client():
 
     mock_receipt = MagicMock()
     mock_receipt.status = 1
-    mock_receipt.block_number = 12345
-    mock_receipt.gas_used = 21000
+    mock_receipt.blockNumber = 12345
+    mock_receipt.gasUsed = 21000
     mock_web3.eth.wait_for_transaction_receipt.return_value = mock_receipt
     mock_web3.eth.send_raw_transaction.return_value = b"\x00" * 32
 

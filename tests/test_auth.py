@@ -9,6 +9,7 @@ from eth_utils import to_checksum_address
 from app import create_app
 from database import db
 from database.models import User, Wallet, Challenge
+from database.enums import UserRole
 from auth.services import create_challenge, verify_signature, AuthError, _normalize_address
 
 
@@ -242,6 +243,18 @@ def test_authenticated_user_can_access_borrower_route(client, test_account):
 def test_authenticated_user_can_access_investor_route(client, test_account):
     with client:
         wallet = to_checksum_address(test_account.address)
+
+        with client.application.app_context():
+            from database.models import User, Wallet
+            from database.enums import UserRole
+            from database import db
+            user = User(email="investor-auth@example.com", password_hash=None, role=UserRole.INVESTOR)
+            db.session.add(user)
+            db.session.commit()
+            wallet_obj = Wallet(user_id=user.id, address=wallet, chain_id=1)
+            db.session.add(wallet_obj)
+            db.session.commit()
+
         challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
         encoded = encode_defunct(text=challenge["message"])
         signature = test_account.sign_message(encoded).signature.hex()

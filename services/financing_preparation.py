@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from database.enums import AssetStatus
 from services.invoice_verification import verify_invoice_eligibility, InvoiceVerificationResult
+from services.token_decimals import get_token_decimals, to_base_units
 
 if TYPE_CHECKING:
     from database.models import Asset, InvoiceDocument
@@ -29,12 +30,6 @@ class FinancingPreparationResult:
     message: str | None = None
 
 
-def _to_wei(value: Decimal | None) -> int | None:
-    if value is None:
-        return None
-    return int(value * 10**18)
-
-
 def _to_timestamp(value: datetime | None) -> int | None:
     if value is None:
         return None
@@ -55,9 +50,12 @@ def prepare_financing(
     document: InvoiceDocument | None = None,
     today: datetime | None = None,
     originator_address: str | None = None,
+    token_decimals: int | None = None,
 ) -> FinancingPreparationResult:
     if today is None:
         today = datetime.utcnow()
+
+    decimals = token_decimals if token_decimals is not None else get_token_decimals()
 
     verification = verify_invoice_eligibility(
         asset,
@@ -83,8 +81,8 @@ def prepare_financing(
         result.message = verification.message
         return result
 
-    face_value_wei = _to_wei(asset.face_value)
-    financing_target_wei = _to_wei(asset.financing_target)
+    face_value_wei = to_base_units(asset.face_value, decimals)
+    financing_target_wei = to_base_units(asset.financing_target, decimals)
     maturity_timestamp = _to_timestamp(asset.due_date)
 
     payload = {

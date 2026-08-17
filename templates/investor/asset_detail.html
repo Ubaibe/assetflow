@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Asset {{ asset.id }} - AssetFlow{% endblock %}
+
+{% block content %}
+<h2>Investment Opportunity #{{ asset.id }}</h2>
+
+<table>
+    <tr>
+        <th>Invoice Number</th>
+        <td>{{ asset.invoice_number or '-' }}</td>
+    </tr>
+    <tr>
+        <th>Face Value</th>
+        <td>{{ asset.face_value }} {{ asset.currency }}</td>
+    </tr>
+    <tr>
+        <th>Financing Target</th>
+        <td>{{ asset.financing_target }} {{ asset.currency }}</td>
+    </tr>
+    <tr>
+        <th>Risk Score</th>
+        <td>{{ asset.risk_score or '-' }}/100 ({{ asset.risk_grade or '-' }})</td>
+    </tr>
+    <tr>
+        <th>Maturity Date</th>
+        <td>{{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}</td>
+    </tr>
+    <tr>
+        <th>Current Status</th>
+        <td>{{ asset.status.value }}</td>
+    </tr>
+    {% if on_chain_total_funded is not none %}
+    <tr>
+        <th>Total Funded (On-Chain)</th>
+        <td>{{ on_chain_total_funded_display }} {{ token_symbol }}</td>
+    </tr>
+    <tr>
+        <th>Remaining Funding (On-Chain)</th>
+        <td>{{ on_chain_remaining_display }} {{ token_symbol }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+{% if asset.status.value == 'listed' or asset.status.value == 'partially_funded' %}
+<h3>Fund This Asset</h3>
+<p>Transactions are executed on <strong>BOT Chain</strong> using {{ token_symbol }}.</p>
+<form method="post" action="/investor/assets/{{ asset.id }}/fund">
+    <label for="amount">Investment Amount ({{ token_symbol }}):</label><br>
+    <input type="number" id="amount" name="amount" step="0.000001" min="0.000001" required><br><br>
+    <button type="submit" class="btn">Fund Asset</button>
+</form>
+{% else %}
+<p>This asset is not currently open for funding.</p>
+{% endif %}
+
+<p><a href="/investor/dashboard" class="btn btn-secondary">Back to Dashboard</a></p>
+{% endblock %}

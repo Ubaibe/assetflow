@@ -43,6 +43,7 @@ class Asset(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     asset_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    blockchain_asset_id: Mapped[int | None] = mapped_column(nullable=True)
     invoice_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
     face_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     financing_target: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)

@@ -11,6 +11,7 @@ npm-debug.log*
 blockchain/artifacts/
 blockchain/cache/
 blockchain/typechain-types/
+blockchain/deployments/
 
 # Python
 __pycache__/

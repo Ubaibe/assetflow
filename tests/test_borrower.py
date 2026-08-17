@@ -1393,7 +1393,14 @@ def test_blockchain_disabled_does_not_make_rpc_call(client):
                     eligible=True,
                     message="Financing is eligible but blockchain submission is disabled",
                 )
-                response = client.post("/borrower/assets", data=data)
+                disabled_config = {
+                    "RPC_URL": None,
+                    "ASSET_REGISTRY_ADDRESS": None,
+                    "PRIVATE_KEY": None,
+                    "CHAIN_ID": None,
+                }
+                with patch.object(client.application, "config", {**client.application.config, **disabled_config}):
+                    response = client.post("/borrower/assets", data=data)
     assert response.status_code == 302
     mock_submit.assert_called_once()
     _, kwargs = mock_submit.call_args

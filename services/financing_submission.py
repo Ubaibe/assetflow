@@ -82,6 +82,10 @@ def _safe_message(exc: BaseException) -> str:
         return "AssetRegistry configuration error"
     if "Authorization" in message or "Bearer" in message:
         return "AssetRegistry authorization error"
+    import re
+    url_pattern = re.compile(r"https?://[^\s]+")
+    if url_pattern.search(message):
+        return "AssetRegistry configuration error"
     return message
 
 
@@ -96,4 +100,8 @@ def sanitize_message(message: str | None) -> str | None:
         return "AssetRegistry configuration error"
     if "Authorization" in message or "Bearer" in message:
         return "AssetRegistry authorization error"
+    import re
+    url_pattern = re.compile(r"https?://[^\s]+")
+    if url_pattern.search(message):
+        return "AssetRegistry configuration error"
     return message

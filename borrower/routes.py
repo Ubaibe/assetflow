@@ -193,6 +193,9 @@ def create_asset():
                 "warning",
             )
         elif submission is not None and submission.submitted:
+            if asset.blockchain_asset_id is None and submission.asset_id is not None:
+                asset.blockchain_asset_id = submission.asset_id
+                db.session.commit()
             flash("Invoice uploaded successfully and financing has been submitted to the blockchain", "success")
         elif submission is not None and not submission.submitted:
             flash(

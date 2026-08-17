@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from web3 import Web3
+from web3.middleware.proof_of_authority import ExtraDataToPOAMiddleware
 
 if TYPE_CHECKING:
     from web3.contract import Contract
@@ -66,9 +67,10 @@ class AssetRegistryClient:
             raise AssetRegistryConfigurationError("ASSET_REGISTRY_ADDRESS is required")
 
         self._web3 = Web3(Web3.HTTPProvider(rpc_url))
+        self._web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
         if not self._web3.is_connected():
-            raise AssetRegistryConfigurationError(f"Cannot connect to RPC at {rpc_url}")
+            raise AssetRegistryConfigurationError("Cannot connect to RPC")
 
         abi = self._load_abi()
         self._contract = self._web3.eth.contract(
@@ -145,9 +147,9 @@ class AssetRegistryClient:
         result = AssetRegistryTransactionResult(
             transaction_hash=Web3.to_hex(tx_hash),
             asset_id=asset_id,
-            block_number=receipt.block_number,
+            block_number=receipt.blockNumber,
             success=True,
-            gas_used=receipt.gas_used,
+            gas_used=receipt.gasUsed,
             message="Asset created successfully",
         )
         return result

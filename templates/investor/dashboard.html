@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Investor Dashboard - AssetFlow{% endblock %}
+
+{% block content %}
+<h2>Investor Marketplace</h2>
+<p>Browse invoice financing opportunities secured by BOT Chain.</p>
+
+{% if assets %}
+<table>
+    <thead>
+        <tr>
+            <th>Asset</th>
+            <th>Invoice</th>
+            <th>Face Value</th>
+            <th>Target</th>
+            <th>Risk</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th>On-Chain Funded</th>
+            <th>Remaining</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for asset in assets %}
+        <tr>
+            <td>{{ asset.id }}</td>
+            <td>{{ asset.invoice_number or '-' }}</td>
+            <td>{{ asset.face_value }} {{ asset.currency }}</td>
+            <td>{{ asset.financing_target }} {{ asset.currency }}</td>
+            <td>{{ asset.risk_score or '-' }}/100 ({{ asset.risk_grade or '-' }})</td>
+            <td>{{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}</td>
+            <td>{{ asset.status.value }}</td>
+            <td>
+                {% if asset.on_chain_total_funded is not none %}
+                    {{ asset.on_chain_total_funded }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                {% if asset.on_chain_remaining is not none %}
+                    {{ asset.on_chain_remaining }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td><a href="/investor/assets/{{ asset.id }}" class="btn">View</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No financing opportunities available right now.</p>
+{% endif %}
+
+<p><a href="/borrower/dashboard" class="btn btn-secondary">Borrower Dashboard</a></p>
+{% endblock %}
