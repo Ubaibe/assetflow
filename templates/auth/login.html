@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Wallet - AssetFlow</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #374151;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 420px;
+            width: 100%;
+            padding: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        .wallet-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .wallet-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .message.error {
+            display: block;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--error);
+        }
+
+        .message.success {
+            display: block;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .footer a:hover { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo"><span>AssetFlow</span></div>
+            <p class="subtitle">Connect your wallet to access the application.</p>
+
+            <input
+                type="text"
+                id="walletAddress"
+                class="wallet-input"
+                placeholder="0x..."
+                autocomplete="off"
+            />
+
+            <button id="connectBtn" class="btn btn-primary">Connect Wallet</button>
+
+            <div id="message" class="message"></div>
+        </div>
+
+        <div class="footer">
+            <a href="/">Back to AssetFlow</a>
+        </div>
+    </div>
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const walletInput = document.getElementById('walletAddress');
+        const messageEl = document.getElementById('message');
+
+        function showMessage(text, type) {
+            messageEl.textContent = text;
+            messageEl.className = 'message ' + type;
+        }
+
+        function getNextUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('next') || '/';
+        }
+
+        async function requestWalletAddress() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    return accounts[0] || null;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        async function signMessage(message) {
+            if (typeof window.ethereum === 'undefined') {
+                throw new Error('No wallet found');
+            }
+            const signature = await window.ethereum.request({
+                method: 'personal_sign',
+                params: [message, walletInput.value],
+            });
+            return signature;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            const walletAddress = walletInput.value.trim();
+
+            if (!walletAddress) {
+                showMessage('Please enter a wallet address.', 'error');
+                return;
+            }
+
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            showMessage('', '');
+
+            try {
+                let addressToUse = walletAddress;
+
+                if (!/^0x[a-fA-F0-9]{40}$/.test(addressToUse)) {
+                    showMessage('Invalid wallet address format.', 'error');
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect Wallet';
+                    return;
+                }
+
+                const challengeRes = await fetch('/auth/challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet_address: addressToUse }),
+                });
+
+                if (!challengeRes.ok) {
+                    const data = await challengeRes.json();
+                    throw new Error(data.error || 'Failed to create challenge');
+                }
+
+                const challenge = await challengeRes.json();
+
+                let signature;
+                try {
+                    signature = await signMessage(challenge.message);
+                } catch (e) {
+                    showMessage('Wallet signing was rejected or failed.', 'error');
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect Wallet';
+                    return;
+                }
+
+                const verifyRes = await fetch('/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet_address: addressToUse,
+                        signature: signature,
+                        challenge_id: challenge.challenge_id,
+                    }),
+                });
+
+                if (!verifyRes.ok) {
+                    const data = await verifyRes.json();
+                    throw new Error(data.error || 'Authentication failed');
+                }
+
+                showMessage('Authentication successful! Redirecting...', 'success');
+                setTimeout(() => {
+                    window.location.href = getNextUrl();
+                }, 500);
+            } catch (err) {
+                showMessage(err.message || 'An unexpected error occurred.', 'error');
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Wallet';
+            }
+        });
+    </script>
+</body>
+</html>

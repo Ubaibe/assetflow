@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, request, url_for
 from flask_login import LoginManager, login_required
 from database import db
 from config import Config
@@ -8,10 +8,13 @@ from investor import bp as investor_bp
 
 
 login_manager = LoginManager()
+login_manager.login_view = "auth.login_page"
 
 
 @login_manager.unauthorized_handler
 def unauthorized():
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        return redirect(url_for("auth.login_page", next=request.url))
     return {"error": "Unauthorized"}, 401
 
 

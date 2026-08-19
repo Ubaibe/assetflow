@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta
-from flask import jsonify, request, session
+from flask import jsonify, request, render_template, session
 from flask_login import login_user, logout_user
 from .services import create_challenge, verify_signature, AuthError
 
 
 def init_routes(bp):
+    @bp.route("/", methods=["GET"])
+    def login_page():
+        next_url = request.args.get("next", "/")
+        return render_template("auth/login.html", next_url=next_url)
+
     @bp.route("/challenge", methods=["POST"])
     def challenge():
         data = request.get_json(silent=True) or {}
