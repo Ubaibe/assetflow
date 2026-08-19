@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AssetFlow — AI-Powered RWA Invoice Financing on BOT Chain</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --border: #374151;
+            --gradient-start: #1e3a8a;
+            --gradient-end: #0f172a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+        /* Navigation */
+        nav {
+            background: rgba(10, 14, 23, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 4rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, var(--accent), #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--text-primary); }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+        .btn-small { padding: 0.5rem 1rem; font-size: 0.85rem; }
+
+        /* Hero */
+        .hero {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            padding: 6rem 0 4rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero .tagline {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+
+        .hero .cta-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 1.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Sections */
+        section { padding: 4rem 0; }
+
+        section h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        section .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        /* Problem/Solution */
+        .problem-solution {
+            background: var(--bg-secondary);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card p { color: var(--text-secondary); }
+
+        /* How it works */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .step {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            background: linear-gradient(135deg, var(--accent), #60a5fa);
+            color: white;
+            font-weight: 700;
+            border-radius: 50%;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .step h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .step p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .step-arrow {
+            display: none;
+        }
+
+        @media (min-width: 768px) {
+            .step-arrow {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                color: var(--accent);
+            }
+        }
+
+        /* BOT Chain section */
+        .botchain-section { background: var(--bg-secondary); }
+
+        .chain-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .contract-address {
+            font-family: "SF Mono", Monaco, monospace;
+            font-size: 0.85rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid var(--border);
+            word-break: break-all;
+            color: #93c5fd;
+        }
+
+        /* Proof section */
+        .proof-section { background: var(--bg-primary); }
+
+        .proof-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .proof-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        .proof-check {
+            color: var(--success);
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .proof-content { flex: 1; }
+
+        .proof-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .proof-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tx-links {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        /* Architecture */
+        .architecture-section { background: var(--bg-secondary); }
+
+        .arch-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+
+        .arch-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            min-width: 140px;
+        }
+
+        .arch-box strong {
+            display: block;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .arch-box span {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .arch-arrow {
+            color: var(--accent);
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Investor / Borrower sections */
+        .audience-section {
+            background: var(--bg-primary);
+        }
+
+        .audience-card {
+            background: linear-gradient(135deg, var(--bg-card), rgba(59, 130, 246, 0.05));
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 2.5rem;
+            text-align: center;
+        }
+
+        .audience-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .audience-card p {
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto 1.5rem;
+        }
+
+        /* AI Section */
+        .ai-section { background: var(--bg-secondary); }
+
+        .ai-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .ai-feature {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .ai-feature h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .ai-feature p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Security */
+        .security-section { background: var(--bg-primary); }
+
+        .security-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .security-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        .security-icon {
+            color: var(--success);
+            font-size: 1.25rem;
+        }
+
+        .security-text {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 3rem 0 2rem;
+            text-align: center;
+        }
+
+        footer .footer-brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        footer .footer-links {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+
+        footer .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        footer .footer-links a:hover { color: var(--accent); }
+
+        footer .footer-note {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .nav-links { display: none; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <a href="/" class="logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#60a5fa" />
+                            <stop offset="100%" style="stop-color:#3b82f6" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                <span>AssetFlow</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="/investor/dashboard">Marketplace</a></li>
+                <li><a href="/borrower/dashboard">For Borrowers</a></li>
+                <li><a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer">BOT Chain</a></li>
+            </ul>
+            <a href="/investor/dashboard" class="btn btn-primary btn-small">Get Started</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1>AI-Powered RWA Invoice Financing <span>on BOT Chain</span></h1>
+            <p class="tagline">Turn verified business invoices into investable financing opportunities with AI-powered analysis, transparent on-chain settlement, and privacy-conscious financial infrastructure.</p>
+            <div class="cta-group">
+                <a href="/investor/dashboard" class="btn btn-primary">Explore Investor Marketplace</a>
+                <a href="/borrower/dashboard" class="btn btn-secondary">I'm a Borrower</a>
+            </div>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                BOT Chain Testnet • Live
+            </div>
+        </div>
+    </section>
+
+    <section class="problem-solution">
+        <div class="container">
+            <div class="grid-2">
+                <div class="card">
+                    <h3>The Problem</h3>
+                    <p>Businesses with valid invoices often wait weeks or months for payment, creating working-capital constraints. Traditional invoice financing involves slow underwriting, fragmented verification, limited investor access, high friction, and opaque funding records.</p>
+                </div>
+                <div class="card">
+                    <h3>The Solution</h3>
+                    <p>AssetFlow allows eligible invoices to become financing assets that investors can fund through a structured marketplace. AI extracts and verifies invoice data, the asset is registered on BOT Chain, and funding transactions are executed transparently on-chain.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works">
+        <div class="container">
+            <h2>How AssetFlow Works</h2>
+            <p class="subtitle">From invoice upload to on-chain funding in five steps.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h4>Invoice Upload</h4>
+                    <p>Borrowers upload invoice documents (PDF, PNG, JPG) through a secure portal.</p>
+                </div>
+                <div class="step-arrow">↓</div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h4>AI Analysis</h4>
+                    <p>Document processing and AI extraction analyze the invoice to extract key fields such as amount, currency, dates, and invoice number.</p>
+                </div>
+                <div class="step-arrow">↓</div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h4>On-Chain Asset</h4>
+                    <p>Verified invoices are registered as RWA financing assets on BOT Chain through the AssetRegistry contract.</p>
+                </div>
+                <div class="step-arrow">↓</div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h4>Investor Funding</h4>
+                    <p>Investors browse the marketplace and fund assets through the FinancingPool using the configured payment token.</p>
+                </div>
+                <div class="step-arrow">↓</div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h4>Settlement & Records</h4>
+                    <p>On-chain AssetFunded events provide immutable funding proof, while local records maintain operational auditability.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="botchain-section">
+        <div class="container">
+            <h2>Live BOT Chain Testnet</h2>
+            <p class="subtitle">AssetFlow is actively deployed and tested on BOT Chain Testnet.</p>
+
+            <div class="chain-stats">
+                <div class="stat">
+                    <div class="stat-label">Network</div>
+                    <div class="stat-value">BOT Chain Testnet</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Chain ID</div>
+                    <div class="stat-value">968</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Payment Token</div>
+                    <div class="stat-value">USDT</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Token Decimals</div>
+                    <div class="stat-value">6</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Network Status</div>
+                    <div class="stat-value" style="color: var(--success);">● Live</div>
+                </div>
+            </div>
+
+            <h3 style="text-align: center; margin-bottom: 1rem; font-size: 1.1rem;">Contract Addresses</h3>
+            <div class="grid-2">
+                <div>
+                    <div class="stat-label" style="margin-bottom: 0.5rem;">AssetRegistry</div>
+                    <div class="contract-address">0x30179Fe77Da4CDA73df824C65DF39F733864A8A7</div>
+                </div>
+                <div>
+                    <div class="stat-label" style="margin-bottom: 0.5rem;">FinancingPool</div>
+                    <div class="contract-address">0x7a4C69AE659eFFEdcCb631236a5Dc6E9673f4fF9</div>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <div class="stat-label" style="margin-bottom: 0.5rem;">Payment Token</div>
+                    <div class="contract-address">0x75edC9335175Fc0552D51D48439F229c10420fe</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="proof-section">
+        <div class="container">
+            <h2>Verified On-Chain Activity</h2>
+            <p class="subtitle">Real BOT Chain testnet transactions demonstrating the complete financing lifecycle.</p>
+
+            <div class="proof-grid">
+                <div class="proof-item">
+                    <div class="proof-check">✓</div>
+                    <div class="proof-content">
+                        <div class="proof-label">Asset Created</div>
+                        <div class="proof-value">PASS</div>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-label">On-chain Asset ID</div>
+                    <div class="proof-value">#3</div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-label">Funding Target</div>
+                    <div class="proof-value">80.00 USDT</div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-label">Amount Funded</div>
+                    <div class="proof-value">50.00 USDT</div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-label">Remaining Funding</div>
+                    <div class="proof-value">30.00 USDT</div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-check">✓</div>
+                    <div class="proof-content">
+                        <div class="proof-label">AssetFunded Event</div>
+                        <div class="proof-value">PASS (logIndex 1)</div>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-check">✓</div>
+                    <div class="proof-content">
+                        <div class="proof-label">Investment Persistence</div>
+                        <div class="proof-value">PASS</div>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-check">✓</div>
+                    <div class="proof-content">
+                        <div class="proof-label">Blockchain Transaction Persistence</div>
+                        <div class="proof-value">PASS</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tx-links">
+                <a href="https://scan.bohr.life/tx/0x4686222c1b7f84028c273c6d75cc187153ae0852ab107599c931113716ffd58b" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small">View Asset Creation Transaction</a>
+                <a href="https://scan.bohr.life/tx/0xc8d4e1789fb90909519393f12cb57cd1ec976673e8dd6ad697162b53e7c8291e" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small">View Funding Transaction</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="architecture-section">
+        <div class="container">
+            <h2>Smart Contract Architecture</h2>
+            <p class="subtitle">Two core contracts power the AssetFlow financing lifecycle on BOT Chain.</p>
+
+            <div class="arch-diagram">
+                <div class="arch-box">
+                    <strong>AssetRegistry</strong>
+                    <span>Asset Identity & Status</span>
+                </div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-box">
+                    <strong>FinancingPool</strong>
+                    <span>Funding & Repayment</span>
+                </div>
+                <div class="arch-arrow">↓</div>
+                <div class="arch-box">
+                    <strong>USDT</strong>
+                    <span>Payment Token</span>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 2rem;">
+                <div class="card">
+                    <h3>AssetRegistry</h3>
+                    <p>Registers and tracks financing assets on-chain. Manages asset lifecycle status transitions, originator identity, financing targets, maturity timestamps, and risk scores. The FinancingPool is authorized through this registry.</p>
+                </div>
+                <div class="card">
+                    <h3>FinancingPool</h3>
+                    <p>Receives investor funding against registered assets, enforces financing caps, and emits AssetFunded events. Also handles originator repayments and pro-rata return claims for investors.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="audience-section">
+        <div class="container">
+            <div class="grid-2">
+                <div class="audience-card">
+                    <h3>For Investors</h3>
+                    <p>Browse eligible invoice financing opportunities and fund available assets using USDT on BOT Chain. Track on-chain funding state and transaction history.</p>
+                    <a href="/investor/dashboard" class="btn btn-primary">Explore Opportunities</a>
+                </div>
+                <div class="audience-card">
+                    <h3>For Borrowers</h3>
+                    <p>Submit invoice documents through the AssetFlow workflow. AI extracts and verifies the data, and eligible invoices become on-chain financing assets.</p>
+                    <a href="/borrower/dashboard" class="btn btn-secondary">Borrower Portal</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="container">
+            <h2>AI-Powered Invoice Analysis</h2>
+            <p class="subtitle">Document processing and extraction reduce manual underwriting effort.</p>
+
+            <div class="ai-features">
+                <div class="ai-feature">
+                    <h4>Document Processing</h4>
+                    <p>Supports PDF, PNG, and JPG invoice documents with magic-byte validation and MIME type checking.</p>
+                </div>
+                <div class="ai-feature">
+                    <h4>Field Extraction</h4>
+                    <p>Extracts invoice number, face value, currency, issue date, and due date from uploaded documents.</p>
+                </div>
+                <div class="ai-feature">
+                    <h4>Eligibility Verification</h4>
+                    <p>Validates invoice completeness, date ordering, and non-past-due status before on-chain registration.</p>
+                </div>
+                <div class="ai-feature">
+                    <h4>Pluggable Providers</h4>
+                    <p>Supports mock, AgentRouter, OpenAI, and OpenRouter providers for document analysis.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="security-section">
+        <div class="container">
+            <h2>Production-Oriented Hardening</h2>
+            <p class="subtitle">Security and reliability measures implemented for the hackathon deployment.</p>
+
+            <div class="security-grid">
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Role-Based Access Control</div>
+                </div>
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Private Configuration</div>
+                </div>
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Token Decimal Validation</div>
+                </div>
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Transaction Metadata Persistence</div>
+                </div>
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Deployment Network Guards</div>
+                </div>
+                <div class="security-item">
+                    <div class="security-icon">✓</div>
+                    <div class="security-text">Mainnet Deployment Safety Gate</div>
+                </div>
+            </div>
+
+            <p style="text-align: center; color: var(--text-secondary); margin-top: 1.5rem; font-size: 0.9rem;">
+                Production-oriented hardening implemented for the hackathon deployment. No formal third-party security audit has been performed.
+            </p>
+        </div>
+    </section>
+
+    <section style="background: var(--bg-secondary); text-align: center;">
+        <div class="container">
+            <h2>BOT Chain Builder Challenge #2</h2>
+            <p class="subtitle">AssetFlow aligns with the BOT Chain Builder Challenge by delivering a real RWA financing application with AI-native document analysis and live BOT Chain Testnet integration.</p>
+            <div class="cta-group" style="justify-content: center; margin-top: 2rem;">
+                <a href="https://github.com/Ubaibe/assetflow" target="_blank" rel="noopener noreferrer" class="btn btn-primary">View Source Code</a>
+                <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">BOT Chain Explorer</a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-brand">AssetFlow</div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">AI-Powered RWA Invoice Financing on BOT Chain</p>
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/investor/dashboard">Marketplace</a>
+                <a href="/borrower/dashboard">Borrower Portal</a>
+                <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer">BOT Chain Explorer</a>
+                <a href="https://github.com/Ubaibe/assetflow" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </div>
+            <div class="footer-note">
+                BOT Chain Testnet • Chain ID 968<br>
+                No live blockchain transactions occur when viewing this page.
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

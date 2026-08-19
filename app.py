@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 from flask_login import LoginManager, login_required
 from database import db
 from config import Config
@@ -35,6 +35,10 @@ def create_app():
     @app.route("/public")
     def public_route():
         return {"message": "Public"}
+
+    @app.route("/")
+    def index():
+        return render_template("index.html")
 
     with app.app_context():
         db.create_all()
