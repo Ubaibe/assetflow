@@ -159,7 +159,6 @@
                 <div class="wallet-display">
                     <span id="walletAddressDisplay"></span>
                 </div>
-                <button id="authenticateBtn" class="btn btn-primary">Authenticate</button>
                 <button id="disconnectBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Disconnect</button>
                 <button id="switchNetworkBtn" class="btn btn-secondary" style="margin-top: 0.5rem; display: none;">Switch to BOT Chain Testnet</button>
             </div>
@@ -177,8 +176,9 @@
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
     <script>
         (function() {
+            let abortAuth = false;
+
             const connectBtn = document.getElementById('connectBtn');
-            const authenticateBtn = document.getElementById('authenticateBtn');
             const disconnectBtn = document.getElementById('disconnectBtn');
             const switchNetworkBtn = document.getElementById('switchNetworkBtn');
             const walletSection = document.getElementById('walletSection');
@@ -197,8 +197,6 @@
 
             function setState(state, data) {
                 connectBtn.style.display = 'none';
-                authenticateBtn.disabled = false;
-                authenticateBtn.textContent = 'Authenticate';
                 disconnectBtn.style.display = 'none';
                 switchNetworkBtn.style.display = 'none';
                 walletSection.style.display = 'none';
@@ -217,18 +215,15 @@
                         break;
                     case 'connected':
                         walletSection.style.display = 'block';
-                        authenticateBtn.style.display = 'block';
                         disconnectBtn.style.display = 'block';
                         if (EXPECTED_CHAIN_ID) {
                             switchNetworkBtn.style.display = 'block';
                         }
                         walletAddressDisplay.textContent = AssetFlowWalletAuth.shortenAddress(data.address);
-                        subtitle.textContent = 'Wallet connected. Click Authenticate to continue.';
+                        subtitle.textContent = 'Wallet connected. Please approve the authentication signature in MetaMask.';
                         break;
                     case 'authenticating':
-                        authenticateBtn.disabled = true;
-                        authenticateBtn.textContent = 'Authenticating...';
-                        subtitle.textContent = 'Please sign the message in your wallet.';
+                        subtitle.textContent = 'Waiting for wallet signature...';
                         break;
                     case 'success':
                         subtitle.textContent = 'Authentication successful! Redirecting...';
@@ -242,40 +237,20 @@
                 }
             }
 
-            connectBtn.addEventListener('click', async () => {
-                setState('connecting');
-                showMessage('', '');
-
-                try {
-                    const address = await AssetFlowWalletAuth.connectWallet();
-
-                    if (EXPECTED_CHAIN_ID) {
-                        await AssetFlowWalletAuth.checkNetwork(EXPECTED_CHAIN_ID);
-                    }
-
-                    setState('connected', { address });
-                } catch (err) {
-                    showMessage(err.message || 'Wallet connection failed.', 'error');
-                    setState('error');
-                }
-            });
-
-            authenticateBtn.addEventListener('click', async () => {
+            async function runAuthentication(address) {
                 setState('authenticating');
                 showMessage('', '');
+                abortAuth = false;
 
                 try {
-                    let address = AssetFlowWalletAuth.connectedAddress;
-                    if (!address) {
-                        address = await AssetFlowWalletAuth.connectWallet();
-                        if (EXPECTED_CHAIN_ID) {
-                            await AssetFlowWalletAuth.checkNetwork(EXPECTED_CHAIN_ID);
-                        }
-                    }
-
                     const challenge = await AssetFlowWalletAuth.requestChallenge(address);
+                    if (abortAuth) return;
+
                     const signature = await AssetFlowWalletAuth.signMessage(challenge.message);
+                    if (abortAuth) return;
+
                     const result = await AssetFlowWalletAuth.verifySignature(address, signature, challenge.challenge_id);
+                    if (abortAuth) return;
 
                     if (result.error) {
                         throw new Error(result.error);
@@ -296,9 +271,41 @@
                     showMessage(err.message || 'Authentication failed.', 'error');
                     setState('error');
                 }
+            }
+
+            connectBtn.addEventListener('click', async () => {
+                setState('connecting');
+                showMessage('', '');
+                abortAuth = false;
+
+                try {
+                    const address = await AssetFlowWalletAuth.connectWallet();
+                    if (abortAuth) return;
+
+                    let networkOk = true;
+                    if (EXPECTED_CHAIN_ID) {
+                        try {
+                            await AssetFlowWalletAuth.checkNetwork(EXPECTED_CHAIN_ID);
+                        } catch (networkErr) {
+                            networkOk = false;
+                            showMessage(networkErr.message || 'Please switch your wallet to BOT Chain Testnet.', 'error');
+                        }
+                    }
+                    if (abortAuth) return;
+
+                    setState('connected', { address });
+
+                    if (networkOk) {
+                        await runAuthentication(address);
+                    }
+                } catch (err) {
+                    showMessage(err.message || 'Wallet connection failed.', 'error');
+                    setState('error');
+                }
             });
 
             disconnectBtn.addEventListener('click', async () => {
+                abortAuth = true;
                 await AssetFlowWalletAuth.logout();
                 setState('initial');
             });
@@ -313,6 +320,11 @@
                     showMessage('Switched to BOT Chain Testnet.', 'success');
                     switchNetworkBtn.disabled = false;
                     switchNetworkBtn.textContent = 'Switch to BOT Chain Testnet';
+                    
+                    const address = AssetFlowWalletAuth.connectedAddress;
+                    if (address) {
+                        await runAuthentication(address);
+                    }
                 } catch (err) {
                     showMessage(err.message || 'Failed to switch network.', 'error');
                     switchNetworkBtn.disabled = false;
@@ -324,14 +336,17 @@
                 window.ethereum.on('accountsChanged', (accounts) => {
                     if (accounts.length === 0) {
                         AssetFlowWalletAuth.setConnectedAddress(null);
+                        abortAuth = true;
                         setState('initial');
                     } else {
                         AssetFlowWalletAuth.setConnectedAddress(accounts[0]);
+                        abortAuth = true;
                         setState('connected', { address: accounts[0] });
                     }
                 });
 
                 window.ethereum.on('chainChanged', () => {
+                    abortAuth = true;
                     setState('initial');
                 });
             }
