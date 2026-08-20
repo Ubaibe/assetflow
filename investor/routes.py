@@ -82,7 +82,7 @@ def _enrich_asset_with_on_chain_state(asset, client):
 @bp.route("/dashboard")
 @login_required
 def dashboard():
-    if current_user.role != UserRole.INVESTOR:
+    if str(current_user.role or "") != UserRole.INVESTOR.value:
         abort(403)
 
     assets = _get_fundable_assets()
@@ -103,7 +103,7 @@ def dashboard():
 @bp.route("/assets/<int:asset_id>")
 @login_required
 def asset_detail(asset_id):
-    if current_user.role != UserRole.INVESTOR:
+    if str(current_user.role or "") != UserRole.INVESTOR.value:
         abort(403)
 
     asset = Asset.query.get_or_404(asset_id)
@@ -150,7 +150,7 @@ def asset_detail(asset_id):
 @bp.route("/assets/<int:asset_id>/fund", methods=["POST"])
 @login_required
 def fund_asset(asset_id):
-    if current_user.role != UserRole.INVESTOR:
+    if str(current_user.role or "") != UserRole.INVESTOR.value:
         abort(403)
 
     asset = Asset.query.get_or_404(asset_id)

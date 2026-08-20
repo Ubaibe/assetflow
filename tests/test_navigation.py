@@ -268,3 +268,35 @@ def test_onboarding_rejects_external_next(client, test_account):
         assert response.status_code == 200
         assert response.get_json()["next"] == "/investor/dashboard"
 
+
+def test_new_user_investor_onboarding_reaches_dashboard(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        client.post("/auth/onboarding/role", json={"role": "investor"})
+        response = client.get("/investor/dashboard")
+        assert response.status_code == 200
+
+
+def test_new_user_borrower_onboarding_reaches_dashboard(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        client.post("/auth/onboarding/role", json={"role": "borrower"})
+        response = client.get("/borrower/dashboard")
+        assert response.status_code == 200
+

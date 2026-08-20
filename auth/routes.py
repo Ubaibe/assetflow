@@ -6,6 +6,20 @@ from database import db
 from database.enums import UserRole
 
 
+def _role_value(role):
+    if role is None:
+        return None
+    if isinstance(role, UserRole):
+        return role.value
+    return str(role)
+
+
+def _has_role(user, role):
+    if user is None or role is None:
+        return False
+    return _role_value(user.role) == role.value
+
+
 def init_routes(bp):
     @bp.route("/", methods=["GET"])
     def login_page():
@@ -17,9 +31,9 @@ def init_routes(bp):
     @login_required
     def onboarding():
         next_url = request.args.get("next", "")
-        if current_user.role == UserRole.INVESTOR:
+        if _has_role(current_user, UserRole.INVESTOR):
             return redirect(url_for("investor.dashboard"))
-        if current_user.role == UserRole.BORROWER:
+        if _has_role(current_user, UserRole.BORROWER):
             return redirect(url_for("borrower.dashboard"))
         safe_next = _safe_next(next_url) or "/"
         return render_template("auth/onboarding.html", next_url=safe_next)
