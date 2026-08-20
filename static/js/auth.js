@@ -1,16 +1,35 @@
 const AssetFlowWalletAuth = (() => {
   let connectedAddress = null;
 
+  function getChainId() {
+    if (!window.ethereum) return null;
+    return window.ethereum.request({ method: "eth_chainId" });
+  }
+
   async function connectWallet() {
     if (!window.ethereum) {
-      throw new Error("No EIP-1193 wallet detected");
+      throw new Error(
+        "No compatible EVM wallet detected. Please install MetaMask or another compatible wallet."
+      );
     }
     const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
     if (!accounts || accounts.length === 0) {
-      throw new Error("Wallet connection rejected");
+      throw new Error("Wallet connection was cancelled.");
     }
     connectedAddress = accounts[0];
     return connectedAddress;
+  }
+
+  async function checkNetwork(expectedChainId) {
+    if (!window.ethereum || !expectedChainId) return true;
+    const chainId = await getChainId();
+    if (!chainId) return true;
+    const expected = typeof expectedChainId === "number" ? expectedChainId : parseInt(expectedChainId, 10);
+    const actual = typeof chainId === "string" ? parseInt(chainId, 16) : chainId;
+    if (actual !== expected) {
+      throw new Error("Please switch your wallet to BOT Chain Testnet.");
+    }
+    return true;
   }
 
   async function requestChallenge(address) {
@@ -65,25 +84,13 @@ const AssetFlowWalletAuth = (() => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
-  async function authenticate() {
-    try {
-      const address = await connectWallet();
-      const challenge = await requestChallenge(address);
-      const signature = await signMessage(challenge.message);
-      const result = await verifySignature(address, signature, challenge.challenge_id);
-      return { ...result, shortened_address: shortenAddress(address) };
-    } catch (error) {
-      return { error: error.message };
-    }
-  }
-
   return {
     connectWallet,
+    checkNetwork,
     requestChallenge,
     signMessage,
     verifySignature,
     logout,
     shortenAddress,
-    authenticate,
   };
 })();

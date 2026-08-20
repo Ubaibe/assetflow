@@ -65,22 +65,6 @@
             margin-bottom: 2rem;
         }
 
-        .wallet-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 0.5rem;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            margin-bottom: 1rem;
-        }
-
-        .wallet-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
         .btn {
             display: block;
             width: 100%;
@@ -107,6 +91,16 @@
             cursor: not-allowed;
         }
 
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
         .message {
             margin-top: 1rem;
             padding: 0.75rem 1rem;
@@ -129,6 +123,18 @@
             color: var(--success);
         }
 
+        .wallet-display {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-family: monospace;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
         .footer {
             text-align: center;
             margin-top: 1.5rem;
@@ -147,15 +153,15 @@
     <div class="container">
         <div class="card">
             <div class="logo"><span>AssetFlow</span></div>
-            <p class="subtitle">Connect your wallet to access the application.</p>
+            <p class="subtitle" id="subtitle">Use your EVM wallet to securely access AssetFlow.</p>
 
-            <input
-                type="text"
-                id="walletAddress"
-                class="wallet-input"
-                placeholder="0x..."
-                autocomplete="off"
-            />
+            <div id="walletSection" style="display: none;">
+                <div class="wallet-display">
+                    <span id="walletAddressDisplay"></span>
+                </div>
+                <button id="authenticateBtn" class="btn btn-primary">Authenticate</button>
+                <button id="disconnectBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Disconnect</button>
+            </div>
 
             <button id="connectBtn" class="btn btn-primary">Connect Wallet</button>
 
@@ -167,114 +173,132 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
     <script>
-        const connectBtn = document.getElementById('connectBtn');
-        const walletInput = document.getElementById('walletAddress');
-        const messageEl = document.getElementById('message');
+        (function() {
+            const connectBtn = document.getElementById('connectBtn');
+            const authenticateBtn = document.getElementById('authenticateBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const walletSection = document.getElementById('walletSection');
+            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+            const subtitle = document.getElementById('subtitle');
+            const messageEl = document.getElementById('message');
 
-        function showMessage(text, type) {
-            messageEl.textContent = text;
-            messageEl.className = 'message ' + type;
-        }
+            const EXPECTED_CHAIN_ID = {{ chain_id | tojson }};
+            const NEXT_URL = {{ next_url | tojson }};
 
-        function getNextUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('next') || '/';
-        }
+            function showMessage(text, type) {
+                messageEl.textContent = text;
+                messageEl.className = 'message ' + type;
+                messageEl.style.display = text ? 'block' : 'none';
+            }
 
-        async function requestWalletAddress() {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    return accounts[0] || null;
-                } catch (e) {
-                    return null;
+            function setState(state, data) {
+                connectBtn.style.display = 'none';
+                authenticateBtn.disabled = false;
+                authenticateBtn.textContent = 'Authenticate';
+                disconnectBtn.style.display = 'none';
+                walletSection.style.display = 'none';
+                showMessage('', '');
+
+                switch (state) {
+                    case 'initial':
+                        connectBtn.style.display = 'block';
+                        subtitle.textContent = 'Use your EVM wallet to securely access AssetFlow.';
+                        break;
+                    case 'connecting':
+                        connectBtn.style.display = 'block';
+                        connectBtn.disabled = true;
+                        connectBtn.textContent = 'Connecting wallet...';
+                        subtitle.textContent = 'Please confirm the connection in your wallet.';
+                        break;
+                    case 'connected':
+                        walletSection.style.display = 'block';
+                        authenticateBtn.style.display = 'block';
+                        disconnectBtn.style.display = 'block';
+                        walletAddressDisplay.textContent = AssetFlowWalletAuth.shortenAddress(data.address);
+                        subtitle.textContent = 'Wallet connected. Click Authenticate to continue.';
+                        break;
+                    case 'authenticating':
+                        authenticateBtn.disabled = true;
+                        authenticateBtn.textContent = 'Authenticating...';
+                        subtitle.textContent = 'Please sign the message in your wallet.';
+                        break;
+                    case 'success':
+                        subtitle.textContent = 'Authentication successful! Redirecting...';
+                        break;
+                    case 'error':
+                        connectBtn.style.display = 'block';
+                        connectBtn.disabled = false;
+                        connectBtn.textContent = 'Connect Wallet';
+                        subtitle.textContent = 'Use your EVM wallet to securely access AssetFlow.';
+                        break;
                 }
             }
-            return null;
-        }
 
-        async function signMessage(message) {
-            if (typeof window.ethereum === 'undefined') {
-                throw new Error('No wallet found');
-            }
-            const signature = await window.ethereum.request({
-                method: 'personal_sign',
-                params: [message, walletInput.value],
+            connectBtn.addEventListener('click', async () => {
+                setState('connecting');
+                showMessage('', '');
+
+                try {
+                    const address = await AssetFlowWalletAuth.connectWallet();
+
+                    if (EXPECTED_CHAIN_ID) {
+                        await AssetFlowWalletAuth.checkNetwork(EXPECTED_CHAIN_ID);
+                    }
+
+                    setState('connected', { address });
+                } catch (err) {
+                    showMessage(err.message || 'Wallet connection failed.', 'error');
+                    setState('error');
+                }
             });
-            return signature;
-        }
 
-        connectBtn.addEventListener('click', async () => {
-            const walletAddress = walletInput.value.trim();
+            authenticateBtn.addEventListener('click', async () => {
+                setState('authenticating');
+                showMessage('', '');
 
-            if (!walletAddress) {
-                showMessage('Please enter a wallet address.', 'error');
-                return;
-            }
-
-            connectBtn.disabled = true;
-            connectBtn.textContent = 'Connecting...';
-            showMessage('', '');
-
-            try {
-                let addressToUse = walletAddress;
-
-                if (!/^0x[a-fA-F0-9]{40}$/.test(addressToUse)) {
-                    showMessage('Invalid wallet address format.', 'error');
-                    connectBtn.disabled = false;
-                    connectBtn.textContent = 'Connect Wallet';
-                    return;
-                }
-
-                const challengeRes = await fetch('/auth/challenge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ wallet_address: addressToUse }),
-                });
-
-                if (!challengeRes.ok) {
-                    const data = await challengeRes.json();
-                    throw new Error(data.error || 'Failed to create challenge');
-                }
-
-                const challenge = await challengeRes.json();
-
-                let signature;
                 try {
-                    signature = await signMessage(challenge.message);
-                } catch (e) {
-                    showMessage('Wallet signing was rejected or failed.', 'error');
-                    connectBtn.disabled = false;
-                    connectBtn.textContent = 'Connect Wallet';
-                    return;
-                }
+                    const address = AssetFlowWalletAuth.connectedAddress || await AssetFlowWalletAuth.connectWallet();
+                    const challenge = await AssetFlowWalletAuth.requestChallenge(address);
+                    const signature = await AssetFlowWalletAuth.signMessage(challenge.message);
+                    const result = await AssetFlowWalletAuth.verifySignature(address, signature, challenge.challenge_id);
 
-                const verifyRes = await fetch('/auth/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_address: addressToUse,
-                        signature: signature,
-                        challenge_id: challenge.challenge_id,
-                    }),
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+
+                    setState('success');
+                    setTimeout(() => {
+                        window.location.href = NEXT_URL;
+                    }, 500);
+                } catch (err) {
+                    showMessage(err.message || 'Authentication failed.', 'error');
+                    setState('error');
+                }
+            });
+
+            disconnectBtn.addEventListener('click', async () => {
+                await AssetFlowWalletAuth.logout();
+                setState('initial');
+            });
+
+            if (window.ethereum) {
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    if (accounts.length === 0) {
+                        setState('initial');
+                    } else {
+                        setState('connected', { address: accounts[0] });
+                    }
                 });
 
-                if (!verifyRes.ok) {
-                    const data = await verifyRes.json();
-                    throw new Error(data.error || 'Authentication failed');
-                }
-
-                showMessage('Authentication successful! Redirecting...', 'success');
-                setTimeout(() => {
-                    window.location.href = getNextUrl();
-                }, 500);
-            } catch (err) {
-                showMessage(err.message || 'An unexpected error occurred.', 'error');
-                connectBtn.disabled = false;
-                connectBtn.textContent = 'Connect Wallet';
+                window.ethereum.on('chainChanged', () => {
+                    setState('initial');
+                });
             }
-        });
+
+            setState('initial');
+        })();
     </script>
 </body>
 </html>
