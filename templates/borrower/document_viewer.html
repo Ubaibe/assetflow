@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Document - AssetFlow{% endblock %}
+
+{% block content %}
+<div class="document-viewer">
+    <div class="document-header">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+                <h1>Invoice Document</h1>
+                <p class="document-subtitle">Asset #{{ asset.id }} • {{ document.original_filename }}</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="botchain-badge">BOT Chain Testnet</span>
+                <span class="badge badge-info">Chain ID: 968</span>
+            </div>
+        </div>
+        <div class="document-meta-bar">
+            <a href="/borrower/assets/{{ asset.id }}" class="btn btn-secondary btn-small">← Back to Asset</a>
+            <a href="/borrower/dashboard" class="btn btn-secondary btn-small">Borrower Dashboard</a>
+            <a href="/" class="btn btn-secondary btn-small">Home</a>
+        </div>
+    </div>
+
+    <div class="document-meta-card">
+        <h3>Document Details</h3>
+        <div class="document-meta-grid">
+            <div class="metric-item">
+                <div class="metric-label">Filename</div>
+                <div class="metric-value" style="font-size: 0.95rem;">{{ document.original_filename }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">File Type</div>
+                <div class="metric-value">{{ document.mime_type }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">File Size</div>
+                <div class="metric-value">{{ (document.file_size / 1024) | round(1) }} KB</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Uploaded</div>
+                <div class="metric-value">{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Asset ID</div>
+                <div class="metric-value">#{{ asset.id }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">File Hash</div>
+                <div class="metric-value" style="font-family: monospace; font-size: 0.85rem;">{{ document.file_hash[:32] }}...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="document-embed-container">
+        <div class="document-embed-header">
+            <h3>Preview</h3>
+            <a href="/borrower/assets/{{ asset.id }}/document?download=1" class="btn btn-primary btn-small">Download Invoice</a>
+        </div>
+        {% if document.mime_type == 'application/pdf' %}
+            <embed
+                src="/borrower/assets/{{ asset.id }}/document?embed=1"
+                type="application/pdf"
+                class="document-embed"
+            >
+        {% elif document.mime_type in ('image/png', 'image/jpeg', 'image/jpg', 'image/pjpeg') %}
+            <img
+                src="/borrower/assets/{{ asset.id }}/document?embed=1"
+                alt="{{ document.original_filename }}"
+                class="document-embed-image"
+            >
+        {% else %}
+            <div class="document-error">
+                <div class="document-error-icon">📄</div>
+                <h3>Preview not available</h3>
+                <p>This file type cannot be previewed in the browser. Please download the file to view it.</p>
+                <a href="/borrower/assets/{{ asset.id }}/document?download=1" class="btn btn-primary">Download Invoice</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="document-actions">
+        <a href="/borrower/assets/{{ asset.id }}" class="btn btn-secondary">← Back to Asset</a>
+        <a href="/borrower/dashboard" class="btn btn-secondary">Borrower Dashboard</a>
+        <a href="/" class="btn btn-secondary">Home</a>
+    </div>
+</div>
+{% endblock %}

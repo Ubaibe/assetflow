@@ -4,189 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome - AssetFlow</title>
-    <style>
-        :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-card: #1f2937;
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --success: #10b981;
-            --error: #ef4444;
-            --border: #374151;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .container {
-            max-width: 520px;
-            width: 100%;
-            padding: 1.5rem;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .logo span {
-            background: linear-gradient(135deg, #60a5fa, #3b82f6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 2rem;
-        }
-
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.2s;
-            border: none;
-            cursor: pointer;
-            text-align: center;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-primary:hover { background: var(--accent-hover); }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--border);
-        }
-
-        .message {
-            margin-top: 1rem;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .message.error {
-            display: block;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: var(--error);
-        }
-
-        .message.success {
-            display: block;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: var(--success);
-        }
-
-        .wallet-display {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 0.5rem;
-            padding: 0.75rem 1rem;
-            margin-bottom: 1.5rem;
-            text-align: center;
-            font-family: monospace;
-            font-size: 1rem;
-            color: var(--text-primary);
-        }
-
-        .role-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .role-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 1.25rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .role-card:hover {
-            border-color: var(--accent);
-        }
-
-        .role-card h3 {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .role-card p {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 1.5rem;
-            font-size: 0.85rem;
-        }
-
-        .footer a {
-            color: var(--text-secondary);
-            text-decoration: none;
-        }
-
-        .footer a:hover { color: var(--accent); }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <div class="card">
+    <div class="container auth-center">
+        <div class="auth-card">
             <div class="logo"><span>AssetFlow</span></div>
             <p class="subtitle">Welcome to AssetFlow. Choose how you want to explore the platform.</p>
 
-            <div class="wallet-display">
+            <div class="wallet-display" style="margin-bottom: 1.5rem;">
                 {{ wallet_address }}
             </div>
 
@@ -201,11 +27,7 @@
                 </div>
             </div>
 
-            <div id="message" class="message"></div>
-        </div>
-
-        <div class="footer">
-            <a href="/">Back to AssetFlow</a>
+            <div id="message" class="message" style="margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.9rem; display: none;"></div>
         </div>
     </div>
 

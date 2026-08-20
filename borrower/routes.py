@@ -252,9 +252,25 @@ def download_document(asset_id):
         abort(404)
 
     from flask import send_file
-    return send_file(
-        file_path,
-        mimetype=document.mime_type,
-        as_attachment=False,
-        download_name=document.original_filename,
+
+    if request.args.get("embed") == "1":
+        return send_file(
+            file_path,
+            mimetype=document.mime_type,
+            as_attachment=False,
+            download_name=document.original_filename,
+        )
+
+    if request.args.get("download") == "1":
+        return send_file(
+            file_path,
+            mimetype=document.mime_type,
+            as_attachment=True,
+            download_name=document.original_filename,
+        )
+
+    return render_template(
+        "borrower/document_viewer.html",
+        asset=asset,
+        document=document,
     )

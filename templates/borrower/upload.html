@@ -3,20 +3,98 @@
 {% block title %}Upload Invoice - AssetFlow{% endblock %}
 
 {% block content %}
-<h2>Upload Invoice</h2>
-
-<form method="post" action="/borrower/assets" enctype="multipart/form-data">
-    <div style="margin-bottom: 1rem;">
-        <label for="invoice">Select invoice document:</label><br>
-        <input type="file" name="invoice" id="invoice" accept=".pdf,.png,.jpg,.jpeg" required>
+<div class="page-header">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+            <h1>Upload Invoice</h1>
+            <p>Submit an invoice to create a financing opportunity on AssetFlow.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="botchain-badge">BOT Chain Testnet</span>
+            <span class="badge badge-info">Chain ID: 968</span>
+        </div>
     </div>
+    <a href="/borrower/dashboard" class="btn btn-secondary btn-small">← Back to Dashboard</a>
+</div>
 
-    <p class="text-muted">
-        Supported formats: PDF, PNG, JPG/JPEG<br>
-        Maximum file size: {{ max_upload_mb }}MB
-    </p>
+<div class="card" style="max-width: 800px;">
+    <form method="post" action="/borrower/assets" enctype="multipart/form-data">
+        <div class="upload-zone-wrapper">
+            <input
+                type="file"
+                name="invoice"
+                id="invoice"
+                accept=".pdf,.png,.jpg,.jpeg"
+                required
+                class="upload-zone-input"
+            >
+            <label for="invoice" class="upload-zone">
+                <div class="upload-zone-icon">📄</div>
+                <div class="upload-zone-title">Drop your invoice here or click to browse</div>
+                <div class="upload-zone-subtitle">
+                    Supported formats: PDF, PNG, JPG/JPEG<br>
+                    Maximum file size: {{ max_upload_mb }}MB
+                </div>
+            </label>
+        </div>
 
-    <button type="submit" class="btn">Upload</button>
-    <a href="/borrower/dashboard" class="btn btn-secondary">Cancel</a>
-</form>
+        <div class="info-grid">
+            <div class="info-card">
+                <h4>Invoice Information</h4>
+                <p>Upload a valid invoice document. AssetFlow will extract key details including invoice number, amounts, dates, and counterparty information.</p>
+                <ul>
+                    <li>Accepted formats: PDF, PNG, JPG, JPEG</li>
+                    <li>Maximum size: {{ max_upload_mb }}MB</li>
+                    <li>Files are processed securely</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4>Financing Information</h4>
+                <p>Once verified, your invoice becomes a financing opportunity on BOT Chain Testnet. Investors can fund the invoice using USDT.</p>
+                <ul>
+                    <li>AI-powered document processing</li>
+                    <li>Automatic eligibility verification</li>
+                    <li>On-chain financing via BOT Chain</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="submission-flow">
+            <div class="flow-step">
+                <div class="flow-step-icon">1</div>
+                <div class="flow-step-text">Upload Invoice</div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">2</div>
+                <div class="flow-step-text">AI / Document Processing</div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">3</div>
+                <div class="flow-step-text">Asset Verification</div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">4</div>
+                <div class="flow-step-text">Listed on AssetFlow</div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">5</div>
+                <div class="flow-step-text">Investor Funding</div>
+            </div>
+        </div>
+
+        <div class="security-note">
+            <h4>Security & Privacy</h4>
+            <p>Invoice information is processed by AssetFlow to create your financing opportunity. Submitted documents are stored securely and used solely for verification and financing purposes.</p>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary">Create Financing Opportunity</button>
+            <a href="/borrower/dashboard" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
 {% endblock %}

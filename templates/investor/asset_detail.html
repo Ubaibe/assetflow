@@ -1,58 +1,227 @@
 {% extends "base.html" %}
 
-{% block title %}Asset {{ asset.id }} - AssetFlow{% endblock %}
+{% block title %}Investment Opportunity #{{ asset.id }} - AssetFlow{% endblock %}
 
 {% block content %}
-<h2>Investment Opportunity #{{ asset.id }}</h2>
+<div class="opportunity-header">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+            <h1>Investment Opportunity #{{ asset.id }}</h1>
+            <p class="opportunity-subtitle">Review the details of this invoice-backed financing asset.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="botchain-badge">BOT Chain Testnet</span>
+            <span class="badge badge-info">Chain ID: 968</span>
+        </div>
+    </div>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <a href="/investor/dashboard" class="btn btn-secondary btn-small">← Back to Marketplace</a>
+        {% if current_user.is_authenticated and current_user.wallets %}
+            <span class="wallet-display" style="margin-bottom: 0; font-size: 0.9rem; padding: 0.5rem 0.75rem;">
+                {{ current_user.wallets[0].address[:6] }}...{{ current_user.wallets[0].address[-4:] }}
+            </span>
+        {% endif %}
+    </div>
+</div>
 
-<table>
-    <tr>
-        <th>Invoice Number</th>
-        <td>{{ asset.invoice_number or '-' }}</td>
-    </tr>
-    <tr>
-        <th>Face Value</th>
-        <td>{{ asset.face_value }} {{ asset.currency }}</td>
-    </tr>
-    <tr>
-        <th>Financing Target</th>
-        <td>{{ asset.financing_target }} {{ asset.currency }}</td>
-    </tr>
-    <tr>
-        <th>Risk Score</th>
-        <td>{{ asset.risk_score or '-' }}/100 ({{ asset.risk_grade or '-' }})</td>
-    </tr>
-    <tr>
-        <th>Maturity Date</th>
-        <td>{{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}</td>
-    </tr>
-    <tr>
-        <th>Current Status</th>
-        <td>{{ asset.status.value }}</td>
-    </tr>
-    {% if on_chain_total_funded is not none %}
-    <tr>
-        <th>Total Funded (On-Chain)</th>
-        <td>{{ on_chain_total_funded_display }} {{ token_symbol }}</td>
-    </tr>
-    <tr>
-        <th>Remaining Funding (On-Chain)</th>
-        <td>{{ on_chain_remaining_display }} {{ token_symbol }}</td>
-    </tr>
-    {% endif %}
-</table>
+{% set is_fundable = asset.status == 'listed' or asset.status == 'partially_funded' %}
+{% set target = on_chain_target if on_chain_target is not none else asset.financing_target %}
+{% set funded = on_chain_total_funded if on_chain_total_funded is not none else 0 %}
+{% set remaining = on_chain_remaining if on_chain_remaining is not none else (target - funded if target is not none else 0) %}
+{% set pct = (funded / target * 100) if target and target > 0 else 0 %}
+{% set pct_clamped = [pct, 100]|min %}
 
-{% if asset.status.value == 'listed' or asset.status.value == 'partially_funded' %}
-<h3>Fund This Asset</h3>
-<p>Transactions are executed on <strong>BOT Chain</strong> using {{ token_symbol }}.</p>
-<form method="post" action="/investor/assets/{{ asset.id }}/fund">
-    <label for="amount">Investment Amount ({{ token_symbol }}):</label><br>
-    <input type="number" id="amount" name="amount" step="0.000001" min="0.000001" required><br><br>
-    <button type="submit" class="btn">Fund Asset</button>
-</form>
-{% else %}
-<p>This asset is not currently open for funding.</p>
-{% endif %}
+<div class="opportunity-layout">
+    <div>
+        <div class="overview-card" style="margin-bottom: 2rem;">
+            <h3>Asset Overview</h3>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Invoice Number</div>
+                    <div class="metric-value">{{ asset.invoice_number or '-' }}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Face Value</div>
+                    <div class="metric-value">{{ asset.face_value }} {{ asset.currency }}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Financing Target</div>
+                    <div class="metric-value">{{ asset.financing_target }} {{ asset.currency }}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Risk Score</div>
+                    <div class="metric-value">{{ asset.risk_score or '-' }}/100 ({{ asset.risk_grade or '-' }})</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Issue Date</div>
+                    <div class="metric-value">{{ asset.issue_date.strftime('%Y-%m-%d') if asset.issue_date else '-' }}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Maturity Date</div>
+                    <div class="metric-value">{{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value">
+                        {% if asset.status == 'listed' %}
+                            <span class="badge badge-success">Listed</span>
+                        {% elif asset.status == 'partially_funded' %}
+                            <span class="badge badge-warning">Partially Funded</span>
+                        {% elif asset.status == 'fully_funded' %}
+                            <span class="badge badge-info">Fully Funded</span>
+                        {% else %}
+                            <span class="badge badge-info">{{ asset.status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Created</div>
+                    <div class="metric-value">{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                </div>
+            </div>
+        </div>
 
-<p><a href="/investor/dashboard" class="btn btn-secondary">Back to Dashboard</a></p>
+        {% if asset.documents %}
+        <div class="overview-card" style="margin-bottom: 2rem;">
+            <h3>Documents</h3>
+            {% for document in asset.documents %}
+                <div class="metric-item" style="margin-bottom: 0.75rem;">
+                    <div class="metric-label">Original Filename</div>
+                    <div class="metric-value" style="font-size: 0.95rem;">{{ document.original_filename }}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        {{ document.mime_type }} • {{ (document.file_size / 1024) | round(1) }} KB
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="trust-panel">
+            <h3>How Funding Works</h3>
+            <div class="flow-steps">
+                <div class="flow-step">
+                    <div class="flow-step-icon">1</div>
+                    <div class="flow-step-text">Approve token</div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-step-icon">2</div>
+                    <div class="flow-step-text">Fund invoice</div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-step-icon">3</div>
+                    <div class="flow-step-text">Blockchain confirmation</div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-step-icon">4</div>
+                    <div class="flow-step-text">Investment recorded</div>
+                </div>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: center; margin-top: 1rem;">
+                Transactions are executed on <strong>BOT Chain</strong> using <strong>{{ token_symbol }}</strong>.
+            </p>
+        </div>
+    </div>
+
+    <div>
+        <div class="funding-card">
+            <h3>Funding Progress</h3>
+            <div class="progress-large">
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ pct_clamped|float }}%;"></div>
+                </div>
+                <div class="progress-stats">
+                    <div class="progress-stat">
+                        <div class="progress-stat-label">Target</div>
+                        <div class="progress-stat-value">
+                            {{ on_chain_target_display if on_chain_target_display is not none else (asset.financing_target if asset.financing_target is not none else '-') }} {{ token_symbol }}
+                        </div>
+                    </div>
+                    <div class="progress-stat">
+                        <div class="progress-stat-label">Funded</div>
+                        <div class="progress-stat-value">
+                            {{ on_chain_total_funded_display if on_chain_total_funded_display is not none else '-' }} {{ token_symbol }}
+                        </div>
+                    </div>
+                    <div class="progress-stat">
+                        <div class="progress-stat-label">Remaining</div>
+                        <div class="progress-stat-value">
+                            {{ on_chain_remaining_display if on_chain_remaining_display is not none else '-' }} {{ token_symbol }}
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-text" style="margin-top: 0.75rem;">{{ "%.1f"|format(pct_clamped|float) }}% funded</div>
+            </div>
+
+            {% if is_fundable %}
+            <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+                <h3 style="margin-bottom: 0.5rem;">Fund This Opportunity</h3>
+                <p class="funding-helper">
+                    Invest using <strong>{{ token_symbol }}</strong> on BOT Chain Testnet.<br>
+                    Remaining: <strong>{{ on_chain_remaining_display if on_chain_remaining_display is not none else '-' }} {{ token_symbol }}</strong>
+                </p>
+                <form method="post" action="/investor/assets/{{ asset.id }}/fund" class="funding-form">
+                    <div class="form-group">
+                        <label for="amount">Investment Amount ({{ token_symbol }})</label>
+                        <input
+                            type="number"
+                            id="amount"
+                            name="amount"
+                            step="{{ 1 / (10 ** token_decimals) }}"
+                            min="{{ 1 / (10 ** token_decimals) }}"
+                            required
+                            class="form-control"
+                            placeholder="0.00"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary">Fund Asset</button>
+                </form>
+                <p class="funding-limit">
+                    Token decimals: {{ token_decimals }} • BOT Chain Testnet
+                </p>
+            </div>
+            {% else %}
+            <div class="funded-complete">
+                <div class="funded-complete-icon">✅</div>
+                <h3>Funding Complete</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    This asset is no longer open for funding.
+                </p>
+                <div class="metric-grid" style="text-align: left;">
+                    <div class="metric-item">
+                        <div class="metric-label">Target</div>
+                        <div class="metric-value">
+                            {{ on_chain_target_display if on_chain_target_display is not none else (asset.financing_target if asset.financing_target is not none else '-') }} {{ token_symbol }}
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Funded</div>
+                        <div class="metric-value">
+                            {{ on_chain_total_funded_display if on_chain_total_funded_display is not none else '-' }} {{ token_symbol }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="trust-panel" style="margin-top: 1.5rem;">
+            <h3>Security & Trust</h3>
+            <ul class="trust-list">
+                <li>Funding is executed on BOT Chain Testnet (Chain ID: 968)</li>
+                <li>Payment token: {{ token_symbol }} ({{ token_decimals }} decimals)</li>
+                <li>On-chain transaction is recorded and verifiable</li>
+                <li>Asset funding state is synchronized with the application</li>
+                <li>Role-based access control protects investor and borrower workflows</li>
+            </ul>
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small" style="width: 100%;">
+                    View BOT Chain Explorer
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

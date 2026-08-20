@@ -3,53 +3,64 @@
 {% block title %}Asset {{ asset.id }} - AssetFlow{% endblock %}
 
 {% block content %}
-<h2>Asset #{{ asset.id }}</h2>
+<div class="page-header">
+    <h1>Asset #{{ asset.id }}</h1>
+    <p class="text-secondary">Invoice document details and status.</p>
+</div>
 
-<table>
-    <tr>
-        <th>Status</th>
-        <td>{{ asset.status.value }}</td>
-    </tr>
-    <tr>
-        <th>File Hash</th>
-        <td>{{ asset.asset_hash }}</td>
-    </tr>
-    <tr>
-        <th>Created</th>
-        <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-    </tr>
-</table>
-
-{% if document %}
-    <h3>Document</h3>
+<div class="table-wrapper" style="margin-bottom: 2rem;">
     <table>
         <tr>
-            <th>Original Filename</th>
-            <td>{{ document.original_filename }}</td>
-        </tr>
-        <tr>
-            <th>MIME Type</th>
-            <td>{{ document.mime_type }}</td>
-        </tr>
-        <tr>
-            <th>File Size</th>
-            <td>{{ (document.file_size / 1024) | round(1) }} KB</td>
+            <th>Status</th>
+            <td><span class="badge badge-info">{{ asset.status }}</span></td>
         </tr>
         <tr>
             <th>File Hash</th>
-            <td>{{ document.file_hash }}</td>
+            <td>{{ asset.asset_hash }}</td>
         </tr>
         <tr>
-            <th>Uploaded</th>
-            <td>{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <th>Created</th>
+            <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
         </tr>
     </table>
+</div>
+
+{% if document %}
+    <h3>Document</h3>
+    <div class="table-wrapper" style="margin-bottom: 2rem;">
+        <table>
+            <tr>
+                <th>Original Filename</th>
+                <td>{{ document.original_filename }}</td>
+            </tr>
+            <tr>
+                <th>MIME Type</th>
+                <td>{{ document.mime_type }}</td>
+            </tr>
+            <tr>
+                <th>File Size</th>
+                <td>{{ (document.file_size / 1024) | round(1) }} KB</td>
+            </tr>
+            <tr>
+                <th>File Hash</th>
+                <td>{{ document.file_hash }}</td>
+            </tr>
+            <tr>
+                <th>Uploaded</th>
+                <td>{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        </table>
+    </div>
     <p>
-        <a href="/borrower/assets/{{ asset.id }}/document" class="btn">View Document</a>
+        <a href="/borrower/assets/{{ asset.id }}/document" class="btn btn-primary">View Document</a>
     </p>
 {% else %}
-    <p>No document uploaded.</p>
+    <div class="alert alert-warning">
+        No document uploaded.
+    </div>
 {% endif %}
 
-<p><a href="/borrower/dashboard" class="btn btn-secondary">Back to Dashboard</a></p>
+<div style="margin-top: 2rem;">
+    <a href="/borrower/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
 {% endblock %}

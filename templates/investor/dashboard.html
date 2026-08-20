@@ -3,60 +3,143 @@
 {% block title %}Investor Dashboard - AssetFlow{% endblock %}
 
 {% block content %}
-<h2>Investor Marketplace</h2>
-<p>Browse invoice financing opportunities secured by BOT Chain.</p>
+<div class="dashboard-header">
+    <h1>Investor Marketplace</h1>
+    <p>Discover invoice-backed opportunities and fund real-world assets on BOT Chain.</p>
+    <div class="dashboard-meta">
+        <span class="botchain-badge">BOT Chain Testnet</span>
+        <span class="badge badge-info">Chain ID: 968</span>
+    </div>
+</div>
 
 {% if assets %}
-<table>
-    <thead>
-        <tr>
-            <th>Asset</th>
-            <th>Invoice</th>
-            <th>Face Value</th>
-            <th>Target</th>
-            <th>Risk</th>
-            <th>Due Date</th>
-            <th>Status</th>
-            <th>On-Chain Funded</th>
-            <th>Remaining</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
+    {% set total_target = [] %}
+    {% set total_funded = [] %}
+    {% for asset in assets %}
+        {% if asset.on_chain_target is not none %}
+            {% set _ = total_target.append(asset.on_chain_target) %}
+        {% elif asset.financing_target is not none %}
+            {% set _ = total_target.append(asset.financing_target) %}
+        {% endif %}
+        {% if asset.on_chain_total_funded is not none %}
+            {% set _ = total_funded.append(asset.on_chain_total_funded) %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Available Opportunities</div>
+            <div class="kpi-value">{{ assets|length }}</div>
+            <div class="kpi-sub">Fundable assets</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Funding Target</div>
+            <div class="kpi-value">{{ total_target|sum if total_target else 0 }}</div>
+            <div class="kpi-sub">Across all opportunities</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Funded</div>
+            <div class="kpi-value">{{ total_funded|sum if total_funded else 0 }}</div>
+            <div class="kpi-sub">On-chain secured</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Network Status</div>
+            <div class="kpi-value" style="font-size: 1.25rem; margin-top: 0.25rem;">
+                <span class="badge badge-success">Live</span>
+            </div>
+            <div class="kpi-sub">BOT Chain Testnet</div>
+        </div>
+    </div>
+
+    <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Investment Opportunities</h2>
+
+    <div class="asset-grid">
         {% for asset in assets %}
-        <tr>
-            <td>{{ asset.id }}</td>
-            <td>{{ asset.invoice_number or '-' }}</td>
-            <td>{{ asset.face_value }} {{ asset.currency }}</td>
-            <td>{{ asset.financing_target }} {{ asset.currency }}</td>
-            <td>{{ asset.risk_score or '-' }}/100 ({{ asset.risk_grade or '-' }})</td>
-            <td>{{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}</td>
-            <td>{{ asset.status.value }}</td>
-            <td>
-                {% if asset.on_chain_total_funded is not none %}
-                    {{ asset.on_chain_total_funded }}
-                {% else %}
-                    -
-                {% endif %}
-            </td>
-            <td>
-                {% if asset.on_chain_remaining is not none %}
-                    {{ asset.on_chain_remaining }}
-                {% else %}
-                    -
-                {% endif %}
-            </td>
-            <td><a href="/investor/assets/{{ asset.id }}" class="btn">View</a></td>
-        </tr>
+        {% set target = asset.on_chain_target if asset.on_chain_target is not none else asset.financing_target %}
+        {% set funded = asset.on_chain_total_funded if asset.on_chain_total_funded is not none else 0 %}
+        {% set remaining = asset.on_chain_remaining if asset.on_chain_remaining is not none else (target - funded if target is not none else 0) %}
+        {% set pct = (funded / target * 100) if target and target > 0 else 0 %}
+        {% set pct_clamped = [pct, 100]|min %}
+        {% set status_class = 'badge-info' %}
+        {% if asset.status == 'listed' %}{% set status_class = 'badge-success' %}{% endif %}
+        {% if asset.status == 'partially_funded' %}{% set status_class = 'badge-warning' %}{% endif %}
+        {% if asset.status == 'fully_funded' %}{% set status_class = 'badge-info' %}{% endif %}
+
+        <div class="asset-card">
+            <div class="asset-card-header">
+                <div>
+                    <div class="asset-card-title">Asset #{{ asset.id }}</div>
+                    <div class="asset-card-meta">
+                        {% if asset.invoice_number %}
+                            Invoice {{ asset.invoice_number }}
+                        {% else %}
+                            Invoice-backed asset
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="badge {{ status_class }}">{{ asset.status }}</span>
+            </div>
+
+            <div class="asset-card-metrics">
+                <div class="asset-metric">
+                    <div class="asset-metric-label">Target</div>
+                    <div class="asset-metric-value">
+                        {{ target if target is not none else '-' }} {{ asset.currency }}
+                    </div>
+                </div>
+                <div class="asset-metric">
+                    <div class="asset-metric-label">Funded</div>
+                    <div class="asset-metric-value">
+                        {{ funded if funded is not none else '-' }} {{ asset.currency }}
+                    </div>
+                </div>
+                <div class="asset-metric">
+                    <div class="asset-metric-label">Remaining</div>
+                    <div class="asset-metric-value">
+                        {{ remaining if remaining is not none else '-' }} {{ asset.currency }}
+                    </div>
+                </div>
+                <div class="asset-metric">
+                    <div class="asset-metric-label">Due Date</div>
+                    <div class="asset-metric-value">
+                        {{ asset.due_date.strftime('%Y-%m-%d') if asset.due_date else '-' }}
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ pct_clamped }}%;"></div>
+                </div>
+                <div class="progress-text">{{ "%.1f"|format(pct_clamped) }}% funded</div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <a href="/investor/assets/{{ asset.id }}" class="btn btn-primary" style="width: 100%;">View Opportunity</a>
+            </div>
+        </div>
         {% endfor %}
-    </tbody>
-</table>
+    </div>
 {% else %}
-<p>No financing opportunities available right now.</p>
+    <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h3>No financing opportunities available right now.</h3>
+        <p>Check back later for new invoice-backed assets on BOT Chain, or explore the borrower side to see how assets are created.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="/borrower/dashboard" class="btn btn-secondary">Borrower Dashboard</a>
+            <a href="/" class="btn btn-secondary">Back to Home</a>
+        </div>
+    </div>
 {% endif %}
 
-<p>
-    <a href="/borrower/dashboard" class="btn btn-secondary">Borrower Dashboard</a>
-    <a href="/" class="btn btn-secondary">Back to Home</a>
-</p>
+<div class="trust-section">
+    <div class="trust-section-left">
+        <div class="trust-icon">⚡</div>
+        <div>
+            <div class="trust-title">BOT Chain Testnet</div>
+            <div class="trust-subtitle">Chain ID: 968 • Explorer: <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer">scan.bohr.life</a></div>
+        </div>
+    </div>
+    <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small">View Explorer</a>
+</div>
 {% endblock %}
