@@ -32,6 +32,40 @@ const AssetFlowWalletAuth = (() => {
     return true;
   }
 
+  async function switchNetwork(expectedChainId) {
+    if (!window.ethereum || !expectedChainId) return true;
+    const expected = typeof expectedChainId === "number" ? expectedChainId : parseInt(expectedChainId, 10);
+    const hexChainId = "0x" + expected.toString(16);
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: hexChainId }],
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: hexChainId,
+                chainName: "BOT Chain Testnet",
+                nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+                rpcUrls: ["https://rpc.bohr.life"],
+                blockExplorerUrls: ["https://scan.bohr.life"],
+              },
+            ],
+          });
+        } catch (addError) {
+          throw new Error("Failed to add BOT Chain Testnet to your wallet.");
+        }
+      } else {
+        throw new Error("Failed to switch to BOT Chain Testnet.");
+      }
+    }
+    return true;
+  }
+
   async function requestChallenge(address) {
     const response = await fetch("/auth/challenge", {
       method: "POST",
@@ -84,13 +118,19 @@ const AssetFlowWalletAuth = (() => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
+  function setConnectedAddress(address) {
+    connectedAddress = address;
+  }
+
   return {
     connectWallet,
     checkNetwork,
+    switchNetwork,
     requestChallenge,
     signMessage,
     verifySignature,
     logout,
     shortenAddress,
+    setConnectedAddress,
   };
 })();

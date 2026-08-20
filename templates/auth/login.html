@@ -161,6 +161,7 @@
                 </div>
                 <button id="authenticateBtn" class="btn btn-primary">Authenticate</button>
                 <button id="disconnectBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Disconnect</button>
+                <button id="switchNetworkBtn" class="btn btn-secondary" style="margin-top: 0.5rem; display: none;">Switch to BOT Chain Testnet</button>
             </div>
 
             <button id="connectBtn" class="btn btn-primary">Connect Wallet</button>
@@ -179,6 +180,7 @@
             const connectBtn = document.getElementById('connectBtn');
             const authenticateBtn = document.getElementById('authenticateBtn');
             const disconnectBtn = document.getElementById('disconnectBtn');
+            const switchNetworkBtn = document.getElementById('switchNetworkBtn');
             const walletSection = document.getElementById('walletSection');
             const walletAddressDisplay = document.getElementById('walletAddressDisplay');
             const subtitle = document.getElementById('subtitle');
@@ -198,6 +200,7 @@
                 authenticateBtn.disabled = false;
                 authenticateBtn.textContent = 'Authenticate';
                 disconnectBtn.style.display = 'none';
+                switchNetworkBtn.style.display = 'none';
                 walletSection.style.display = 'none';
                 showMessage('', '');
 
@@ -216,6 +219,9 @@
                         walletSection.style.display = 'block';
                         authenticateBtn.style.display = 'block';
                         disconnectBtn.style.display = 'block';
+                        if (EXPECTED_CHAIN_ID) {
+                            switchNetworkBtn.style.display = 'block';
+                        }
                         walletAddressDisplay.textContent = AssetFlowWalletAuth.shortenAddress(data.address);
                         subtitle.textContent = 'Wallet connected. Click Authenticate to continue.';
                         break;
@@ -259,7 +265,14 @@
                 showMessage('', '');
 
                 try {
-                    const address = AssetFlowWalletAuth.connectedAddress || await AssetFlowWalletAuth.connectWallet();
+                    let address = AssetFlowWalletAuth.connectedAddress;
+                    if (!address) {
+                        address = await AssetFlowWalletAuth.connectWallet();
+                        if (EXPECTED_CHAIN_ID) {
+                            await AssetFlowWalletAuth.checkNetwork(EXPECTED_CHAIN_ID);
+                        }
+                    }
+
                     const challenge = await AssetFlowWalletAuth.requestChallenge(address);
                     const signature = await AssetFlowWalletAuth.signMessage(challenge.message);
                     const result = await AssetFlowWalletAuth.verifySignature(address, signature, challenge.challenge_id);
@@ -270,7 +283,14 @@
 
                     setState('success');
                     setTimeout(() => {
-                        window.location.href = NEXT_URL;
+                        const role = result.role;
+                        if (role === 'investor') {
+                            window.location.href = '/investor/dashboard';
+                        } else if (role === 'borrower') {
+                            window.location.href = '/borrower/dashboard';
+                        } else {
+                            window.location.href = '/auth/onboarding?next=' + encodeURIComponent(NEXT_URL || '/');
+                        }
                     }, 500);
                 } catch (err) {
                     showMessage(err.message || 'Authentication failed.', 'error');
@@ -283,11 +303,30 @@
                 setState('initial');
             });
 
+            switchNetworkBtn.addEventListener('click', async () => {
+                switchNetworkBtn.disabled = true;
+                switchNetworkBtn.textContent = 'Switching...';
+                showMessage('', '');
+
+                try {
+                    await AssetFlowWalletAuth.switchNetwork(EXPECTED_CHAIN_ID);
+                    showMessage('Switched to BOT Chain Testnet.', 'success');
+                    switchNetworkBtn.disabled = false;
+                    switchNetworkBtn.textContent = 'Switch to BOT Chain Testnet';
+                } catch (err) {
+                    showMessage(err.message || 'Failed to switch network.', 'error');
+                    switchNetworkBtn.disabled = false;
+                    switchNetworkBtn.textContent = 'Switch to BOT Chain Testnet';
+                }
+            });
+
             if (window.ethereum) {
                 window.ethereum.on('accountsChanged', (accounts) => {
                     if (accounts.length === 0) {
+                        AssetFlowWalletAuth.setConnectedAddress(null);
                         setState('initial');
                     } else {
+                        AssetFlowWalletAuth.setConnectedAddress(accounts[0]);
                         setState('connected', { address: accounts[0] });
                     }
                 });

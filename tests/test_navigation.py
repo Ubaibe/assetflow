@@ -139,3 +139,132 @@ def test_borrower_role_forbidden_from_investor_routes(client, app, test_account)
     _login(client, user_id, test_account)
     response = client.get("/investor/dashboard")
     assert response.status_code == 403
+
+
+def test_unauthenticated_cannot_access_onboarding(client):
+    response = client.get("/auth/onboarding")
+    assert response.status_code == 401
+
+
+def test_authenticated_user_with_no_role_can_access_onboarding(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.get("/auth/onboarding")
+        assert response.status_code == 200
+        assert b"Welcome to AssetFlow" in response.data
+
+
+def test_authenticated_investor_is_redirected_from_onboarding(client, app, test_account):
+    user_id = _create_user(app, UserRole.INVESTOR, test_account)
+    _login(client, user_id, test_account)
+    response = client.get("/auth/onboarding")
+    assert response.status_code == 302
+    assert "/investor/dashboard" in response.headers.get("Location", "")
+
+
+def test_authenticated_borrower_is_redirected_from_onboarding(client, app, test_account):
+    user_id = _create_user(app, UserRole.BORROWER, test_account)
+    _login(client, user_id, test_account)
+    response = client.get("/auth/onboarding")
+    assert response.status_code == 302
+    assert "/borrower/dashboard" in response.headers.get("Location", "")
+
+
+def test_onboarding_role_selection_persists_investor(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.post("/auth/onboarding/role", json={"role": "investor"})
+        assert response.status_code == 200
+        assert response.get_json()["role"] == "investor"
+
+
+def test_onboarding_role_selection_persists_borrower(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.post("/auth/onboarding/role", json={"role": "borrower"})
+        assert response.status_code == 200
+        assert response.get_json()["role"] == "borrower"
+
+
+def test_onboarding_rejects_invalid_role(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.post("/auth/onboarding/role", json={"role": "hacker"})
+        assert response.status_code == 400
+
+
+def test_onboarding_rejects_unauthenticated_role_assignment(client):
+    response = client.post("/auth/onboarding/role", json={"role": "investor"})
+    assert response.status_code == 401
+
+
+def test_onboarding_does_not_overwrite_existing_role(client, app, test_account):
+    user_id = _create_user(app, UserRole.INVESTOR, test_account)
+    _login(client, user_id, test_account)
+    response = client.post("/auth/onboarding/role", json={"role": "borrower"})
+    assert response.status_code == 409
+
+
+def test_onboarding_preserves_next_safely(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.post("/auth/onboarding/role", json={"role": "investor", "next": "/investor/dashboard"})
+        assert response.status_code == 200
+        assert response.get_json()["next"] == "/investor/dashboard"
+
+
+def test_onboarding_rejects_external_next(client, test_account):
+    with client:
+        wallet = to_checksum_address(test_account.address)
+        challenge = client.post("/auth/challenge", json={"wallet_address": wallet}).get_json()
+        encoded = encode_defunct(text=challenge["message"])
+        signature = test_account.sign_message(encoded).signature.hex()
+        client.post("/auth/verify", json={
+            "wallet_address": wallet,
+            "signature": signature,
+            "challenge_id": challenge["challenge_id"],
+        })
+        response = client.post("/auth/onboarding/role", json={"role": "investor", "next": "https://evil.com"})
+        assert response.status_code == 200
+        assert response.get_json()["next"] == "/investor/dashboard"
+
