@@ -5,6 +5,7 @@ from config import Config
 from auth import bp as auth_bp
 from borrower import bp as borrower_bp
 from investor import bp as investor_bp
+from marketplace.routes import bp as marketplace_bp
 
 
 login_manager = LoginManager()
@@ -34,6 +35,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(borrower_bp)
     app.register_blueprint(investor_bp)
+    app.register_blueprint(marketplace_bp)
 
     @app.route("/public")
     def public_route():

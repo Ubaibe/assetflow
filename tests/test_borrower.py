@@ -142,7 +142,7 @@ def test_valid_pdf_upload_succeeds(client):
         data=data,
     )
     assert response.status_code == 302
-    assert response.headers["Location"].startswith("/borrower/assets/")
+    assert response.headers["Location"] == "/borrower/dashboard"
 
     with client.application.app_context():
         asset = Asset.query.first()

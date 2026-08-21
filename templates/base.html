@@ -14,6 +14,7 @@
             <div class="nav-links">
                 <a href="/">Home</a>
                 {% if current_user.is_authenticated %}
+                    <a href="/marketplace">Marketplace</a>
                     {% if current_user.role == 'investor' or current_user.role.value == 'investor' %}
                         <a href="/investor/dashboard">Investor Dashboard</a>
                     {% elif current_user.role == 'borrower' or current_user.role.value == 'borrower' %}
@@ -22,7 +23,7 @@
                     <a href="/auth/logout" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">Logout</a>
                     <form id="logout-form" action="/auth/logout" method="post" style="display:none;"></form>
                 {% else %}
-                    <a href="/auth/?next=/investor/dashboard">Investor</a>
+                    <a href="/auth/?next=/marketplace">Investor</a>
                     <a href="/auth/?next=/borrower/dashboard">Borrower</a>
                 {% endif %}
             </div>

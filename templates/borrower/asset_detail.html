@@ -1,66 +1,126 @@
 {% extends "base.html" %}
 
-{% block title %}Asset {{ asset.id }} - AssetFlow{% endblock %}
+{% block title %}Asset #{{ asset.id }} - AssetFlow{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Asset #{{ asset.id }}</h1>
-    <p class="text-secondary">Invoice document details and status.</p>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+            <h1>Asset #{{ asset.id }}</h1>
+            <p class="text-secondary">Invoice document details and status.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="botchain-badge">BOT Chain Testnet</span>
+            <span class="badge badge-info">Chain ID: 968</span>
+        </div>
+    </div>
+    <a href="/borrower/dashboard" class="btn btn-secondary btn-small">← Back to Dashboard</a>
 </div>
 
-<div class="table-wrapper" style="margin-bottom: 2rem;">
-    <table>
-        <tr>
-            <th>Status</th>
-            <td><span class="badge badge-info">{{ asset.status }}</span></td>
-        </tr>
-        <tr>
-            <th>File Hash</th>
-            <td>{{ asset.asset_hash }}</td>
-        </tr>
-        <tr>
-            <th>Created</th>
-            <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        </tr>
-    </table>
+{% set target = asset.financing_target if asset.financing_target is not none else 0 %}
+{% set funded = 0 %}
+{% for investment in asset.investments %}
+    {% if investment.status == 'confirmed' %}
+        {% set funded = funded + investment.amount %}
+    {% endif %}
+{% endfor %}
+{% set remaining = target - funded %}
+{% set pct = (funded / target * 100) if target and target > 0 else 0 %}
+{% set pct_clamped = [pct, 100] | min %}
+
+<div class="overview-card" style="margin-bottom: 2rem;">
+    <h3>Asset Overview</h3>
+    <div class="metric-grid">
+        <div class="metric-item">
+            <div class="metric-label">Invoice Number</div>
+            <div class="metric-value">{{ asset.invoice_number or '-' }}</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Face Value</div>
+            <div class="metric-value">{{ asset.face_value }} {{ asset.currency }}</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Target Amount</div>
+            <div class="metric-value">{{ target if target is not none else '-' }} {{ asset.currency }}</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Funded</div>
+            <div class="metric-value">{{ funded if funded is not none else '-' }} {{ asset.currency }}</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Remaining</div>
+            <div class="metric-value">{{ remaining if remaining is not none else '-' }} {{ asset.currency }}</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Status</div>
+            <div class="metric-value">
+                {% if asset.status == 'listed' %}
+                    <span class="badge badge-success">Listed</span>
+                {% elif asset.status == 'partially_funded' %}
+                    <span class="badge badge-warning">Partially Funded</span>
+                {% elif asset.status == 'fully_funded' %}
+                    <span class="badge badge-info">Fully Funded</span>
+                {% else %}
+                    <span class="badge badge-info">{{ asset.status }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label">Created</div>
+            <div class="metric-value">{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 1.5rem;">
+        <div class="progress">
+            <div class="progress-bar" style="width: {{ pct_clamped }}%;"></div>
+        </div>
+        <div class="progress-text">{{ "%.1f" % pct_clamped }}% funded</div>
+    </div>
 </div>
 
 {% if document %}
-    <h3>Document</h3>
-    <div class="table-wrapper" style="margin-bottom: 2rem;">
-        <table>
-            <tr>
-                <th>Original Filename</th>
-                <td>{{ document.original_filename }}</td>
-            </tr>
-            <tr>
-                <th>MIME Type</th>
-                <td>{{ document.mime_type }}</td>
-            </tr>
-            <tr>
-                <th>File Size</th>
-                <td>{{ (document.file_size / 1024) | round(1) }} KB</td>
-            </tr>
-            <tr>
-                <th>File Hash</th>
-                <td>{{ document.file_hash }}</td>
-            </tr>
-            <tr>
-                <th>Uploaded</th>
-                <td>{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            </tr>
-        </table>
+    <div class="overview-card" style="margin-bottom: 2rem;">
+        <h3>Document</h3>
+        <div class="metric-grid">
+            <div class="metric-item">
+                <div class="metric-label">Original Filename</div>
+                <div class="metric-value" style="font-size: 0.95rem;">{{ document.original_filename }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">MIME Type</div>
+                <div class="metric-value">{{ document.mime_type }}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">File Size</div>
+                <div class="metric-value">{{ (document.file_size / 1024) | round(1) }} KB</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Uploaded</div>
+                <div class="metric-value">{{ document.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            </div>
+        </div>
+        <p style="margin-top: 1.5rem;">
+            <a href="/borrower/assets/{{ asset.id }}/document" class="btn btn-primary">View Document</a>
+        </p>
     </div>
-    <p>
-        <a href="/borrower/assets/{{ asset.id }}/document" class="btn btn-primary">View Document</a>
-    </p>
 {% else %}
     <div class="alert alert-warning">
         No document uploaded.
     </div>
 {% endif %}
 
-<div style="margin-top: 2rem;">
-    <a href="/borrower/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+<div class="trust-section">
+    <div class="trust-section-left">
+        <div class="trust-icon">⚡</div>
+        <div>
+            <div class="trust-title">BOT Chain Testnet</div>
+            <div class="trust-subtitle">Chain ID: 968 • USDT Payment Token • Explorer: <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer">scan.bohr.life</a></div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="/marketplace" class="btn btn-secondary btn-small">Explore Marketplace</a>
+        <a href="/" class="btn btn-secondary btn-small">Home</a>
+    </div>
 </div>
 {% endblock %}

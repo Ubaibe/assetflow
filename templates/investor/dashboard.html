@@ -82,7 +82,7 @@
 
             <div class="asset-card-metrics">
                 <div class="asset-metric">
-                    <div class="asset-metric-label">Target</div>
+                    <div class="asset-metric-label">Target Amount</div>
                     <div class="asset-metric-value">
                         {{ target if target is not none else '-' }} {{ asset.currency }}
                     </div>
@@ -141,5 +141,6 @@
         </div>
     </div>
     <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small">View Explorer</a>
+    <a href="/marketplace" class="btn btn-secondary btn-small">Marketplace</a>
 </div>
 {% endblock %}

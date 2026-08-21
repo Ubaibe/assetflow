@@ -72,7 +72,7 @@ def test_public_landing_page_returns_200(client):
 def test_landing_page_contains_auth_navigation_links(client):
     response = client.get("/")
     html = response.data.decode()
-    assert "/auth/?next=/investor/dashboard" in html
+    assert "/auth/?next=/marketplace" in html
     assert "/auth/?next=/borrower/dashboard" in html
     assert "https://scan.bohr.life" in html
     assert "https://github.com/Ubaibe/assetflow" in html

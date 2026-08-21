@@ -207,7 +207,7 @@ def create_asset():
         else:
             flash("Invoice uploaded successfully", "success")
 
-        return redirect(url_for("borrower.asset_detail", asset_id=asset.id))
+        return redirect(url_for("borrower.dashboard"))
     except Exception:
         db.session.rollback()
         if destination.exists():

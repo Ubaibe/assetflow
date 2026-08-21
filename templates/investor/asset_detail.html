@@ -45,7 +45,7 @@
                     <div class="metric-value">{{ asset.face_value }} {{ asset.currency }}</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-label">Financing Target</div>
+                    <div class="metric-label">Target Amount</div>
                     <div class="metric-value">{{ asset.financing_target }} {{ asset.currency }}</div>
                 </div>
                 <div class="metric-item">
@@ -134,7 +134,7 @@
                 </div>
                 <div class="progress-stats">
                     <div class="progress-stat">
-                        <div class="progress-stat-label">Target</div>
+                        <div class="progress-stat-label">Target Amount</div>
                         <div class="progress-stat-value">
                             {{ on_chain_target_display if on_chain_target_display is not none else (asset.financing_target if asset.financing_target is not none else '-') }} {{ token_symbol }}
                         </div>
@@ -217,8 +217,11 @@
                 <li>Role-based access control protects investor and borrower workflows</li>
             </ul>
             <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-                <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small" style="width: 100%;">
+                <a href="https://scan.bohr.life" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-small" style="width: 100%; margin-bottom: 0.5rem;">
                     View BOT Chain Explorer
+                </a>
+                <a href="/marketplace" class="btn btn-primary btn-small" style="width: 100%;">
+                    Back to Marketplace
                 </a>
             </div>
         </div>
